@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: V-SportManager - API Backend Infrastructure
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Password for PostgreSQL database
+  SecretKey:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: JWT Secret Key
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+  GitHubRepo:
+    Type: String
+    Description: GitHub repo (format owner/repo-name)
+    Default: tu-usuario/V-SportManager
+
+Resources:
+
+  # ─── VPC & Networking ────────────────────────────────────────
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub vsportmanager-vpc-${Environment}
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub vsportmanager-public-${Environment}
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  # ─── Security Group ──────────────────────────────────────────
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP, HTTPS, SSH
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub vsportmanager-sg-${Environment}
+
+  # ─── IAM Role for EC2 (access to S3) ────────────────────────
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub vsportmanager-ec2-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # ─── S3 Bucket (fotos) ──────────────────────────────────────
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub vsportmanager-fotos-${Environment}-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET]
+            AllowedOrigins: ['*']
+            MaxAge: 3600
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${S3Bucket}/*
+
+  # ─── EC2 Instance (API + PostgreSQL) ─────────────────────────
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2023 us-east-1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+      Tags:
+        - Key: Name
+          Value: !Sub vsportmanager-api-${Environment}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y docker postgresql15-server git python3.11 python3.11-pip
+          
+          # Docker
+          systemctl start docker
+          systemctl enable docker
+          usermod -aG docker ec2-user
+          
+          # PostgreSQL
+          postgresql-setup --initdb
+          systemctl start postgresql
+          systemctl enable postgresql
+          
+          # Create database and user
+          sudo -u postgres psql -c "CREATE USER vsport WITH PASSWORD '${DBPassword}';"
+          sudo -u postgres psql -c "CREATE DATABASE volei OWNER vsport;"
+          sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE volei TO vsport;"
+          
+          # Configure PostgreSQL to accept local connections with password
+          sed -i 's/ident/md5/g' /var/lib/pgsql/data/pg_hba.conf
+          systemctl restart postgresql
+          
+          # Clone repo
+          git clone https://github.com/${GitHubRepo}.git /opt/vsportmanager
+          chown -R ec2-user:ec2-user /opt/vsportmanager
+          
+          # Environment variables
+          cat > /opt/vsportmanager/.env << EOF
+          DB_USER=vsport
+          DB_PASSWORD=${DBPassword}
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_NAME=volei
+          S3_BUCKET=${S3Bucket}
+          S3_REGION=${AWS::Region}
+          SECRET_KEY=${SecretKey}
+          EOF
+          
+          # Install dependencies and start
+          cd /opt/vsportmanager
+          pip3.11 install -r requirements.txt
+          
+          # Start API
+          sudo -u ec2-user bash -c 'cd /opt/vsportmanager && export $(cat .env | xargs) && nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/vsportmanager.log 2>&1 &'
+
+  # ─── Elastic IP ──────────────────────────────────────────────
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref EC2Instance
+      Tags:
+        - Key: Name
+          Value: !Sub vsportmanager-eip-${Environment}
+
+Outputs:
+  APIEndpoint:
+    Description: API URL
+    Value: !Sub http://${ElasticIP}:8000
+  S3BucketName:
+    Description: S3 Bucket for photos
+    Value: !Ref S3Bucket
+  S3BucketURL:
+    Description: S3 Bucket URL
+    Value: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com
+  EC2PublicIP:
+    Description: EC2 Public IP
+    Value: !Ref ElasticIP
+  SSHCommand:
+    Description: SSH command to connect
+    Value: !Sub ssh -i ${KeyPairName}.pem ec2-user@${ElasticIP}

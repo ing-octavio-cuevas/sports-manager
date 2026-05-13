@@ -1,0 +1,35 @@
+name: Deploy API to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /opt/vsportmanager
+
+            # Pull latest code
+            git pull origin main
+
+            # Install dependencies
+            pip3.11 install -r requirements.txt
+
+            # Restart API
+            pkill -f "uvicorn app.main:app" || true
+            export $(cat .env | xargs)
+            nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/vsportmanager.log 2>&1 &
+
+            echo "Deploy complete"

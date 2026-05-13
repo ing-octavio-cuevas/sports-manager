@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#e0e0e0" rx="16"/>
+  <circle cx="100" cy="80" r="35" fill="#9e9e9e"/>
+  <path d="M100 60 L108 78 L128 80 L113 93 L117 113 L100 104 L83 113 L87 93 L72 80 L92 78 Z" fill="#ffc107"/>
+  <text x="100" y="160" text-anchor="middle" font-family="Arial" font-size="14" fill="#757575">Sin logo</text>
+</svg>
