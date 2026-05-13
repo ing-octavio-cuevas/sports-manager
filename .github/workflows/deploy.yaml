@@ -19,23 +19,25 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install Python 3.12 if not present
-            if ! command -v python3.12 &> /dev/null; then
-              sudo yum install -y python3.12 python3.12-pip
-            fi
-
             cd /opt/vsportmanager
 
             # Force pull
             git fetch origin main
             git reset --hard origin/main
 
-            # Install dependencies with Python 3.12
-            python3.12 -m pip install --user -r requirements.txt
+            # Stop existing container
+            sudo docker stop vsportmanager-api || true
+            sudo docker rm vsportmanager-api || true
 
-            # Restart API
-            pkill -f "uvicorn app.main:app" || true
-            export $(cat .env | xargs)
-            nohup python3.12 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/vsportmanager.log 2>&1 &
+            # Build Docker image
+            sudo docker build -t vsportmanager-api .
+
+            # Run container with env vars
+            sudo docker run -d \
+              --name vsportmanager-api \
+              --env-file .env \
+              --network host \
+              --restart unless-stopped \
+              vsportmanager-api
 
             echo "Deploy complete"
