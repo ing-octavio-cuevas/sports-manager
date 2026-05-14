@@ -2,7 +2,7 @@
 # Ejecutar en la EC2 (Amazon Linux 2): sudo bash setup-nginx-ssl.sh
 # Prerequisito: el dominio api.tornealo-sports-api.com ya debe apuntar a esta IP
 
-DOMAIN="api.tornealo-sports-api.com"
+DOMAIN="tornealo-sports-api.com"
 BACKEND_PORT=8000
 
 echo "=== 1. Instalando Nginx y Certbot ==="
