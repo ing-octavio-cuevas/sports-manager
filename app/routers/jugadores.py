@@ -39,7 +39,7 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
 
 
 @router.get("", response_model=list[JugadorResponse])
-def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar jugadores. Filtrar por equipo_id opcionalmente."""
     query = db.query(Jugador)
     if equipo_id:
@@ -91,7 +91,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
 
 
 @router.get("/{jugador_id}", response_model=JugadorResponse)
-def get_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def get_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Obtener un jugador por ID."""
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if not jugador:
@@ -102,6 +102,11 @@ def get_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(
 @router.put("/{jugador_id}", response_model=JugadorResponse)
 def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Actualizar un jugador. Solo se actualizan los campos enviados."""
+    from app.models import Usuario
+    from passlib.context import CryptContext
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if not jugador:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
@@ -112,7 +117,56 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
         mis_equipos = [j.equipo_id for j in mis_jugadores]
         if jugador.equipo_id not in mis_equipos:
             raise HTTPException(status_code=403, detail="Solo puedes editar jugadores de tu propio equipo")
-    for field, value in jugador_data.model_dump(exclude_unset=True).items():
+
+    update_data = jugador_data.model_dump(exclude_unset=True)
+    email = update_data.pop("email", None)
+
+    # Si marcan como capitán, crear o vincular usuario
+    if "es_capitan" in update_data and update_data["es_capitan"] is True and not jugador.es_capitan:
+        if not email:
+            raise HTTPException(status_code=400, detail="Se requiere email para asignar capitán")
+
+        usuario_existente = db.query(Usuario).filter(Usuario.email == email).first()
+        if usuario_existente:
+            # Verificar que no tenga otro jugador en el mismo torneo
+            equipo_actual = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
+            jugadores_del_usuario = db.query(Jugador).filter(Jugador.usuario_id == usuario_existente.id).all()
+            for j in jugadores_del_usuario:
+                equipo_j = db.query(Equipo).filter(Equipo.id == j.equipo_id).first()
+                if equipo_j and equipo_j.torneo_id == equipo_actual.torneo_id:
+                    raise HTTPException(status_code=400, detail="Este usuario ya tiene un jugador en este torneo")
+            # Agregar rol jugador si no lo tiene
+            roles_actuales = set(usuario_existente.roles)
+            roles_actuales.add("jugador")
+            usuario_existente.rol = ",".join(roles_actuales)
+            jugador.usuario_id = usuario_existente.id
+        else:
+            # Crear usuario nuevo con password temporal
+            nuevo_usuario = Usuario(
+                email=email,
+                password_hash=pwd_context.hash("root"),
+                nombre=jugador.nombre,
+                rol="jugador",
+                requiere_cambio_password=True,
+            )
+            db.add(nuevo_usuario)
+            db.flush()
+            jugador.usuario_id = nuevo_usuario.id
+
+    # Si deja de ser capitán, quitar rol jugador o eliminar usuario
+    if "es_capitan" in update_data and update_data["es_capitan"] is False and jugador.es_capitan:
+        if jugador.usuario_id:
+            usuario_jugador = db.query(Usuario).filter(Usuario.id == jugador.usuario_id).first()
+            if usuario_jugador:
+                roles_actuales = set(usuario_jugador.roles)
+                roles_actuales.discard("jugador")
+                if roles_actuales:
+                    usuario_jugador.rol = ",".join(roles_actuales)
+                else:
+                    db.delete(usuario_jugador)
+            jugador.usuario_id = None
+
+    for field, value in update_data.items():
         setattr(jugador, field, value)
     db.commit()
     db.refresh(jugador)
@@ -120,7 +174,7 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
 
 
 @router.delete("/{jugador_id}", status_code=204)
-def delete_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def delete_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Soft delete — desactiva el jugador (estatus = False)."""
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if not jugador:
@@ -136,7 +190,7 @@ from app.config import S3_BUCKET, S3_REGION, S3_URL_BASE
 
 
 @router.post("/{jugador_id}/foto", response_model=JugadorResponse)
-def upload_foto(jugador_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def upload_foto(jugador_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """
     Subir foto de un jugador a S3.
     Se guarda en: anfitrion_{id}/torneo_{id}/equipo_{id}/jugador_{id}_{uuid}.ext

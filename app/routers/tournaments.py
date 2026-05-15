@@ -69,7 +69,7 @@ def create_ubicacion(torneo_id: int, ubicacion: TorneoUbicacionCreate, db: Sessi
 
 
 @router.get("/{torneo_id}/ubicaciones", response_model=list[TorneoUbicacionResponse])
-def list_ubicaciones(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def list_ubicaciones(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar ubicaciones de un torneo."""
     return db.query(TorneoUbicacion).filter(TorneoUbicacion.torneo_id == torneo_id).all()
 

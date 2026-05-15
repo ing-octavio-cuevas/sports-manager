@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models import Jornada, Torneo, Partido
 from app.schemas import JornadaCreate, JornadaUpdate, JornadaResponse
 from app.auth import require_role
-from app.config import ROL_ANFITRION
+from app.config import ROL_ANFITRION,ROL_JUGADOR
 
 router = APIRouter(prefix="/jornadas", tags=["Jornadas"])
 
@@ -31,7 +31,7 @@ def create_jornada(jornada: JornadaCreate, db: Session = Depends(get_db), usuari
 
 
 @router.get("", response_model=list[JornadaResponse])
-def list_jornadas(torneo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def list_jornadas(torneo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar jornadas. Filtrar por torneo_id opcionalmente."""
     query = db.query(Jornada)
     if torneo_id:

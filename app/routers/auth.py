@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Usuario
 from app.schemas import LoginRequest, TokenResponse, UsuarioResponse
 from app.auth import create_access_token, get_current_user
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -31,6 +32,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
             nombre=usuario.nombre,
             roles=usuario.roles,
             estatus=usuario.estatus,
+            requiere_cambio_password=usuario.requiere_cambio_password,
             anfitrion_id=usuario.anfitrion_id,
             fecha_creacion=usuario.fecha_creacion,
         ),
@@ -41,3 +43,16 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 def get_me(usuario: Usuario = Depends(get_current_user)):
     """Obtener datos del usuario logueado."""
     return usuario
+
+
+class CambiarPasswordRequest(BaseModel):
+    new_password: str
+
+
+@router.put("/cambiar-password", status_code=200)
+def cambiar_password(data: CambiarPasswordRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(get_current_user)):
+    """Cambiar contraseña del usuario logueado. Quita la bandera requiere_cambio_password."""
+    usuario.password_hash = pwd_context.hash(data.new_password)
+    usuario.requiere_cambio_password = False
+    db.commit()
+    return {"detail": "Contraseña actualizada"}

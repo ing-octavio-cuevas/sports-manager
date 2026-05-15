@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
 from app.database import get_db
-from app.models import Usuario, Jugador
+from app.models import Usuario, Jugador, Equipo
 from app.schemas import UsuarioCreate, UsuarioResponse
 from app.auth import require_role
 from app.config import ROL_ANFITRION
@@ -31,16 +31,25 @@ def create_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db), usuari
     # Verificar si el email ya existe
     existe = db.query(Usuario).filter(Usuario.email == usuario.email).first()
     if existe:
-        # Si viene con rol jugador, agregar el rol y vincular el jugador
+        # Si viene con rol jugador y el usuario ya existe, agregar rol y vincular
         if "jugador" in usuario.roles:
             roles_actuales = set(existe.roles)
             roles_actuales.add("jugador")
             existe.rol = ",".join(roles_actuales)
-            # Vincular jugador al usuario
             if usuario.jugador_id:
                 jugador = db.query(Jugador).filter(Jugador.id == usuario.jugador_id).first()
                 if not jugador:
                     raise HTTPException(status_code=404, detail="Jugador no encontrado")
+                # Verificar que este jugador no esté ya vinculado a otro usuario
+                if jugador.usuario_id and jugador.usuario_id != existe.id:
+                    raise HTTPException(status_code=400, detail="Este jugador ya está vinculado a otro usuario")
+                # Verificar que no tenga otro jugador en el mismo torneo
+                equipo_nuevo = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
+                jugadores_existentes = db.query(Jugador).filter(Jugador.usuario_id == existe.id).all()
+                for j in jugadores_existentes:
+                    equipo_j = db.query(Equipo).filter(Equipo.id == j.equipo_id).first()
+                    if equipo_j and equipo_j.torneo_id == equipo_nuevo.torneo_id:
+                        raise HTTPException(status_code=400, detail="Este usuario ya tiene un jugador en este torneo")
                 jugador.usuario_id = existe.id
             db.commit()
             db.refresh(existe)
@@ -54,6 +63,7 @@ def create_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db), usuari
         nombre=usuario.nombre,
         rol=",".join(usuario.roles),
         anfitrion_id=usuario.anfitrion_id,
+        requiere_cambio_password=(usuario.password == "root"),
     )
     db.add(db_usuario)
     db.flush()

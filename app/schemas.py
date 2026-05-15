@@ -142,6 +142,7 @@ class JugadorUpdate(BaseModel):
     posicion: Optional[str] = None
     estatus: Optional[bool] = None
     es_capitan: Optional[bool] = None
+    email: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
@@ -226,6 +227,7 @@ class PartidoCreate(BaseModel):
     puntos_local: Optional[int] = 0
     puntos_visitante: Optional[int] = 0
     ubicacion_id: Optional[int] = None
+    fecha_hora: Optional[datetime] = None
     estatus: Optional[str] = None
     tipo: Optional[str] = None
     observaciones: Optional[str] = None
@@ -238,6 +240,7 @@ class PartidoUpdate(BaseModel):
     puntos_local: Optional[int] = None
     puntos_visitante: Optional[int] = None
     ubicacion_id: Optional[int] = None
+    fecha_hora: Optional[datetime] = None
     estatus: Optional[str] = None
     tipo: Optional[str] = None
     observaciones: Optional[str] = None
@@ -252,6 +255,7 @@ class PartidoResponse(BaseModel):
     puntos_local: int
     puntos_visitante: int
     ubicacion_id: Optional[int]
+    fecha_hora: Optional[datetime]
     estatus: Optional[str]
     tipo: Optional[str]
     observaciones: Optional[str]
@@ -344,6 +348,9 @@ class PartidoCapitanResponse(BaseModel):
     estatus: Optional[str]
     tipo: Optional[str]
     ubicacion_id: Optional[int]
+    fecha_hora: Optional[datetime]
+    es_hoy: bool = False
+    caducado: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -373,6 +380,7 @@ class UsuarioResponse(BaseModel):
     nombre: str
     roles: list[str]
     estatus: bool
+    requiere_cambio_password: bool
     anfitrion_id: Optional[int]
     fecha_creacion: Optional[datetime]
 
@@ -407,6 +415,7 @@ class PartidoInfoJugador(BaseModel):
     puntos_local: int
     puntos_visitante: int
     ubicacion_id: Optional[int]
+    fecha_hora: Optional[datetime]
     estatus: Optional[str]
     tipo: Optional[str]
 
@@ -428,3 +437,35 @@ class JugadorInfoCompleta(BaseModel):
     nombre: str
     email: str
     torneos: list[TorneoInfoJugador] = []
+
+
+# ─── Estado de asistencia de un partido ──────────────────────
+
+class EstadoAsistenciaPartido(BaseModel):
+    partido_id: int
+    equipo_local_id: int
+    equipo_visitante_id: int
+    asistencia_local_completada: bool
+    asistencia_visitante_completada: bool
+    registrado_por_local: Optional[int] = None
+    registrado_por_visitante: Optional[int] = None
+
+
+# ─── Resumen de asistencia por equipo ────────────────────────
+
+class AsistenciaResumenJugador(BaseModel):
+    jugador_id: int
+    jugador_nombre: str
+    jugador_numero: Optional[int]
+    es_capitan: bool
+    partidos_asistidos: int
+    total_partidos: int
+    porcentaje_asistencia: float
+
+
+class AsistenciaResumenEquipo(BaseModel):
+    equipo_id: int
+    equipo_nombre: str
+    torneo_id: int
+    total_partidos: int
+    jugadores: list[AsistenciaResumenJugador] = []

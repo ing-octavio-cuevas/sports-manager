@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.database import get_db
-from app.models import Asistencia, Partido, Jugador
-from app.schemas import AsistenciaCreate, AsistenciaResponse, PartidoCapitanResponse
+from app.models import Asistencia, Partido, Jugador, Equipo
+from app.schemas import AsistenciaCreate, AsistenciaResponse, PartidoCapitanResponse, AsistenciaResumenEquipo, AsistenciaResumenJugador
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
 
@@ -15,8 +15,10 @@ router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """
     Obtener los partidos en los que el capitán puede registrar asistencia.
-    Devuelve partidos del equipo del capitán.
+    Incluye es_hoy y caducado para filtrar en el front.
     """
+    from datetime import date
+
     capitan = db.query(Jugador).filter(
         Jugador.id == capitan_id,
         Jugador.es_capitan == True,
@@ -32,7 +34,26 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
         Partido.estatus != "Jugado",
     ).all()
 
-    return partidos
+    hoy = date.today()
+    resultado = []
+    for p in partidos:
+        es_hoy = p.fecha_hora.date() == hoy if p.fecha_hora else False
+        caducado = p.fecha_hora.date() < hoy if p.fecha_hora else False
+        resultado.append(PartidoCapitanResponse(
+            id=p.id,
+            torneo_id=p.torneo_id,
+            jornada_id=p.jornada_id,
+            equipo_local_id=p.equipo_local_id,
+            equipo_visitante_id=p.equipo_visitante_id,
+            estatus=p.estatus,
+            tipo=p.tipo,
+            ubicacion_id=p.ubicacion_id,
+            fecha_hora=p.fecha_hora,
+            es_hoy=es_hoy,
+            caducado=caducado,
+        ))
+
+    return resultado
 
 
 @router.post("", response_model=list[AsistenciaResponse], status_code=201)
@@ -54,6 +75,13 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    # Validar que sea el día del partido
+    from datetime import date
+    if partido.fecha_hora:
+        hoy = date.today()
+        if partido.fecha_hora.date() != hoy:
+            raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia el día del partido")
 
     # Validar que el capitán pertenece a uno de los equipos del partido
     if capitan.equipo_id not in [partido.equipo_local_id, partido.equipo_visitante_id]:
@@ -107,6 +135,60 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     return resultado
 
 
+@router.get("/equipo/{equipo_id}/resumen", response_model=AsistenciaResumenEquipo)
+def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+    """
+    Resumen de asistencia por equipo.
+    Devuelve por cada jugador: partidos asistidos / total partidos del equipo.
+    """
+    equipo = db.query(Equipo).filter(Equipo.id == equipo_id).first()
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    # Total de partidos del equipo en el torneo con estatus "Jugado"
+    partidos = db.query(Partido).filter(
+        Partido.torneo_id == torneo_id,
+        Partido.estatus == "Jugado",
+        or_(
+            Partido.equipo_local_id == equipo_id,
+            Partido.equipo_visitante_id == equipo_id,
+        ),
+    ).all()
+    total_partidos = len(partidos)
+    partido_ids = [p.id for p in partidos]
+
+    # Jugadores del equipo
+    jugadores = db.query(Jugador).filter(Jugador.equipo_id == equipo_id).all()
+
+    resumen = []
+    for jugador in jugadores:
+        # Contar asistencias de este jugador en los partidos del equipo
+        asistidos = db.query(Asistencia).filter(
+            Asistencia.jugador_id == jugador.id,
+            Asistencia.partido_id.in_(partido_ids),
+        ).count() if partido_ids else 0
+
+        porcentaje = round((asistidos / total_partidos) * 100, 1) if total_partidos > 0 else 0.0
+
+        resumen.append(AsistenciaResumenJugador(
+            jugador_id=jugador.id,
+            jugador_nombre=jugador.nombre,
+            jugador_numero=jugador.numero,
+            es_capitan=jugador.es_capitan,
+            partidos_asistidos=asistidos,
+            total_partidos=total_partidos,
+            porcentaje_asistencia=porcentaje,
+        ))
+
+    return AsistenciaResumenEquipo(
+        equipo_id=equipo.id,
+        equipo_nombre=equipo.nombre,
+        torneo_id=torneo_id,
+        total_partidos=total_partidos,
+        jugadores=resumen,
+    )
+
+
 @router.get("/partido/{partido_id}", response_model=list[AsistenciaResponse])
 def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """Listar asistencias de un partido."""
@@ -126,6 +208,58 @@ def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Dep
             jugador_foto=jugador.foto if jugador else None,
         ))
     return resultado
+
+
+from app.schemas import EstadoAsistenciaPartido
+
+
+@router.get("/partido/{partido_id}/estado", response_model=EstadoAsistenciaPartido)
+def get_estado_asistencia(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+    """
+    Estado de asistencia de un partido.
+    Indica si cada equipo ya completó su registro de asistencia.
+    El capitán del equipo local registra asistencia del visitante y viceversa.
+    """
+    partido = db.query(Partido).filter(Partido.id == partido_id).first()
+    if not partido:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    # Buscar si el capitán del equipo local ya registró (registra jugadores del visitante)
+    capitan_local = db.query(Jugador).filter(
+        Jugador.equipo_id == partido.equipo_local_id,
+        Jugador.es_capitan == True,
+    ).first()
+
+    capitan_visitante = db.query(Jugador).filter(
+        Jugador.equipo_id == partido.equipo_visitante_id,
+        Jugador.es_capitan == True,
+    ).first()
+
+    # El capitán local registra asistencia del visitante
+    asistencia_local = None
+    if capitan_local:
+        asistencia_local = db.query(Asistencia).filter(
+            Asistencia.partido_id == partido_id,
+            Asistencia.registrado_por == capitan_local.id,
+        ).first()
+
+    # El capitán visitante registra asistencia del local
+    asistencia_visitante = None
+    if capitan_visitante:
+        asistencia_visitante = db.query(Asistencia).filter(
+            Asistencia.partido_id == partido_id,
+            Asistencia.registrado_por == capitan_visitante.id,
+        ).first()
+
+    return EstadoAsistenciaPartido(
+        partido_id=partido_id,
+        equipo_local_id=partido.equipo_local_id,
+        equipo_visitante_id=partido.equipo_visitante_id,
+        asistencia_local_completada=asistencia_local is not None,
+        asistencia_visitante_completada=asistencia_visitante is not None,
+        registrado_por_local=capitan_local.id if capitan_local and asistencia_local else None,
+        registrado_por_visitante=capitan_visitante.id if capitan_visitante and asistencia_visitante else None,
+    )
 
 
 @router.delete("/{asistencia_id}", status_code=204)

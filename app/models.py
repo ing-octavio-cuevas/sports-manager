@@ -128,6 +128,7 @@ class Partido(Base):
     puntos_local = Column(Integer, default=0)
     puntos_visitante = Column(Integer, default=0)
     ubicacion_id = Column(Integer, ForeignKey("torneo_ubicaciones.id"), nullable=True)
+    fecha_hora = Column(DateTime, nullable=True)
     estatus = Column(String(50), nullable=True)
     tipo = Column(String(50), nullable=True)
     observaciones = Column(String(500), nullable=True)
@@ -213,6 +214,7 @@ class Usuario(Base):
     def roles(self, value):
         self.rol = ",".join(value) if value else ""
     estatus = Column(Boolean, default=True)
+    requiere_cambio_password = Column(Boolean, default=False)
     anfitrion_id = Column(Integer, ForeignKey("anfitrion.id"), nullable=True)
     fecha_creacion = Column(DateTime, server_default=func.now())
 
