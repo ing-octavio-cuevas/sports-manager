@@ -25,8 +25,12 @@ def create_equipo(equipo: EquipoCreate, db: Session = Depends(get_db), usuario=D
 
 @router.get("", response_model=list[EquipoResponse])
 def list_equipos(torneo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
-    """Listar equipos."""
+    """Listar equipos. Anfitrión solo ve equipos de sus torneos."""
     query = db.query(Equipo)
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        # Solo equipos de torneos del anfitrión
+        torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
+        query = query.filter(Equipo.torneo_id.in_(torneos_ids))
     if torneo_id:
         query = query.filter(Equipo.torneo_id == torneo_id)
     return query.all()

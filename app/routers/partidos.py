@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Partido, PartidoArbitraje
+from app.models import Partido, PartidoArbitraje, Torneo
 from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
@@ -15,6 +15,11 @@ def create_partido(partido: PartidoCreate, db: Session = Depends(get_db), usuari
     """Crear un nuevo partido con sus registros de arbitraje para cada equipo."""
     if partido.equipo_local_id == partido.equipo_visitante_id:
         raise HTTPException(status_code=400, detail="Un equipo no puede jugar contra sí mismo")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     db_partido = Partido(**partido.model_dump())
     db.add(db_partido)
     db.flush()  # Obtener el id del partido sin hacer commit
@@ -38,6 +43,10 @@ def list_partidos(
 ):
     """Listar partidos. Filtrar por torneo_id y/o jornada_id."""
     query = db.query(Partido)
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
+        query = query.filter(Partido.torneo_id.in_(torneos_ids))
     if torneo_id:
         query = query.filter(Partido.torneo_id == torneo_id)
     if jornada_id:
@@ -51,6 +60,11 @@ def get_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depends(
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     return partido
 
 
@@ -60,6 +74,11 @@ def update_partido(partido_id: int, partido_data: PartidoUpdate, db: Session = D
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     data = partido_data.model_dump(exclude_unset=True)
     # Validar que no juegue contra sí mismo si se cambian equipos
     local = data.get("equipo_local_id", partido.equipo_local_id)
@@ -79,6 +98,11 @@ def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depen
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     db.delete(partido)
     db.commit()
 
@@ -104,6 +128,10 @@ def get_combinaciones_pendientes(torneo_id: int, vueltas: int = 2, db: Session =
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        if torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
 
     # Obtener equipos activos del torneo
     equipos = db.query(Equipo).filter(
@@ -161,6 +189,10 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        if torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
 
     # Equipos del torneo
     equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id).all()

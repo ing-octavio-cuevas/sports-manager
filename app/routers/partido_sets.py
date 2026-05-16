@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PartidoSet, Partido
+from app.models import PartidoSet, Partido, Torneo
 from app.schemas import PartidoSetCreate, PartidoSetUpdate, PartidoSetResponse
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
@@ -16,6 +16,11 @@ def create_set(partido_id: int, set_data: PartidoSetCreate, db: Session = Depend
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     db_set = PartidoSet(partido_id=partido_id, **set_data.model_dump())
     db.add(db_set)
     db.commit()
@@ -26,6 +31,13 @@ def create_set(partido_id: int, set_data: PartidoSetCreate, db: Session = Depend
 @router.get("", response_model=list[PartidoSetResponse])
 def list_sets(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar sets de un partido."""
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        partido = db.query(Partido).filter(Partido.id == partido_id).first()
+        if partido:
+            torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+            if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+                raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     return db.query(PartidoSet).filter(
         PartidoSet.partido_id == partido_id
     ).order_by(PartidoSet.numero_set).all()
@@ -40,6 +52,13 @@ def update_set(partido_id: int, set_id: int, set_data: PartidoSetUpdate, db: Ses
     ).first()
     if not db_set:
         raise HTTPException(status_code=404, detail="Set no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        partido = db.query(Partido).filter(Partido.id == partido_id).first()
+        if partido:
+            torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+            if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+                raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     for field, value in set_data.model_dump(exclude_unset=True).items():
         setattr(db_set, field, value)
     db.commit()
@@ -56,5 +75,12 @@ def delete_set(partido_id: int, set_id: int, db: Session = Depends(get_db), usua
     ).first()
     if not db_set:
         raise HTTPException(status_code=404, detail="Set no encontrado")
+    # Filtro anfitrión
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        partido = db.query(Partido).filter(Partido.id == partido_id).first()
+        if partido:
+            torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
+            if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+                raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     db.delete(db_set)
     db.commit()
