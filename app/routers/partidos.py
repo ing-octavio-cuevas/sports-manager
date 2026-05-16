@@ -16,7 +16,7 @@ def create_partido(partido: PartidoCreate, db: Session = Depends(get_db), usuari
     if partido.equipo_local_id == partido.equipo_visitante_id:
         raise HTTPException(status_code=400, detail="Un equipo no puede jugar contra sí mismo")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -44,7 +44,7 @@ def list_partidos(
     """Listar partidos. Filtrar por torneo_id y/o jornada_id."""
     query = db.query(Partido)
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
         query = query.filter(Partido.torneo_id.in_(torneos_ids))
     if torneo_id:
@@ -61,7 +61,7 @@ def get_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depends(
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -75,7 +75,7 @@ def update_partido(partido_id: int, partido_data: PartidoUpdate, db: Session = D
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -99,7 +99,7 @@ def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depen
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -129,7 +129,7 @@ def get_combinaciones_pendientes(torneo_id: int, vueltas: int = 2, db: Session =
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         if torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
 
@@ -190,7 +190,7 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         if torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
 

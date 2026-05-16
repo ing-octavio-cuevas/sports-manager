@@ -31,8 +31,8 @@ def create_set(partido_id: int, set_data: PartidoSetCreate, db: Session = Depend
 @router.get("", response_model=list[PartidoSetResponse])
 def list_sets(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar sets de un partido."""
-    # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    # Filtro anfitrión (solo si no tiene rol jugador)
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         partido = db.query(Partido).filter(Partido.id == partido_id).first()
         if partido:
             torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()

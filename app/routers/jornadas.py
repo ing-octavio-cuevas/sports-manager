@@ -17,7 +17,7 @@ def create_jornada(jornada: JornadaCreate, db: Session = Depends(get_db), usuari
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         if torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
     # Verificar que no exista la misma jornada (torneo + numero)
@@ -39,7 +39,7 @@ def list_jornadas(torneo_id: int = None, db: Session = Depends(get_db), usuario=
     """Listar jornadas. Filtrar por torneo_id opcionalmente."""
     query = db.query(Jornada)
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
         query = query.filter(Jornada.torneo_id.in_(torneos_ids))
     if torneo_id:
@@ -54,7 +54,7 @@ def get_jornada(jornada_id: int, db: Session = Depends(get_db), usuario=Depends(
     if not jornada:
         raise HTTPException(status_code=404, detail="Jornada no encontrada")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == jornada.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -68,7 +68,7 @@ def update_jornada(jornada_id: int, jornada_data: JornadaUpdate, db: Session = D
     if not jornada:
         raise HTTPException(status_code=404, detail="Jornada no encontrada")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == jornada.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
@@ -87,7 +87,7 @@ def delete_jornada(jornada_id: int, db: Session = Depends(get_db), usuario=Depen
     if not jornada:
         raise HTTPException(status_code=404, detail="Jornada no encontrada")
     # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneo = db.query(Torneo).filter(Torneo.id == jornada.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")

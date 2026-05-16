@@ -19,8 +19,8 @@ router = APIRouter(prefix="/partido-arbitraje", tags=["Partido Arbitraje"])
 def list_arbitrajes(partido_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar arbitrajes. Filtrar por partido_id opcionalmente."""
     query = db.query(PartidoArbitraje)
-    # Filtro anfitrión
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+    # Filtro anfitrión (solo si no tiene rol jugador)
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
         partidos_ids = [p.id for p in db.query(Partido).filter(Partido.torneo_id.in_(torneos_ids)).all()]
         query = query.filter(PartidoArbitraje.partido_id.in_(partidos_ids))
