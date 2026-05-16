@@ -41,7 +41,8 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
 @router.get("", response_model=list[JugadorResponse])
 def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar jugadores. Filtrar por equipo_id opcionalmente."""
-    query = db.query(Jugador)
+    from sqlalchemy.orm import joinedload
+    query = db.query(Jugador).options(joinedload(Jugador.usuario))
     if equipo_id:
         query = query.filter(Jugador.equipo_id == equipo_id)
     return query.all()
