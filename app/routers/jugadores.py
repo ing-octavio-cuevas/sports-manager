@@ -35,6 +35,15 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
         if jugador.equipo_id not in mis_equipos:
             raise HTTPException(status_code=403, detail="Solo puedes agregar jugadores a tu propio equipo")
 
+    # Validar que solo haya un capitán por equipo
+    if jugador.es_capitan:
+        capitan_existente = db.query(Jugador).filter(
+            Jugador.equipo_id == jugador.equipo_id,
+            Jugador.es_capitan == True,
+        ).first()
+        if capitan_existente:
+            raise HTTPException(status_code=400, detail="Este equipo ya tiene un capitán asignado")
+
     data = jugador.model_dump()
     celular = data.pop("celular", None)
 
@@ -82,14 +91,19 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
 def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar jugadores. Filtrar por equipo_id opcionalmente."""
     from sqlalchemy.orm import joinedload
+    from sqlalchemy import or_
+
     query = db.query(Jugador).options(joinedload(Jugador.usuario))
+
     if equipo_id:
         query = query.filter(Jugador.equipo_id == equipo_id)
-    # Filtro anfitrión: solo ve jugadores de equipos de sus torneos
-    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
-        torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
-        equipos_ids = [e.id for e in db.query(Equipo).filter(Equipo.torneo_id.in_(torneos_ids)).all()]
-        query = query.filter(Jugador.equipo_id.in_(equipos_ids))
+    else:
+        # Sin equipo_id, filtrar según rol
+        if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+            torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
+            equipos_ids = [e.id for e in db.query(Equipo).filter(Equipo.torneo_id.in_(torneos_ids)).all()]
+            query = query.filter(Jugador.equipo_id.in_(equipos_ids))
+
     return query.all()
 
 
@@ -175,8 +189,16 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
     update_data = jugador_data.model_dump(exclude_unset=True)
     celular = update_data.pop("celular", None)
 
-    # Si marcan como capitán, crear o vincular usuario
+    # Si marcan como capitán, validar que no haya otro
     if "es_capitan" in update_data and update_data["es_capitan"] is True and not jugador.es_capitan:
+        capitan_existente = db.query(Jugador).filter(
+            Jugador.equipo_id == jugador.equipo_id,
+            Jugador.es_capitan == True,
+            Jugador.id != jugador_id,
+        ).first()
+        if capitan_existente:
+            raise HTTPException(status_code=400, detail="Este equipo ya tiene un capitán asignado")
+
         if not celular:
             raise HTTPException(status_code=400, detail="Se requiere celular para asignar capitán")
 
