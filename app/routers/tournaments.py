@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Torneo, TorneoUbicacion, Partido
 from app.auth import require_role
-from app.config import ROL_ANFITRION, ROL_JUGADOR
+from app.config import ROL_ANFITRION, ROL_JUGADOR, ROL_JUGADOR
 from app.schemas import (
     TorneoCreate,
     TorneoUpdate,
@@ -15,6 +15,12 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/torneos", tags=["Torneos"])
+
+
+def _verificar_acceso_torneo(torneo, usuario):
+    """Verifica que el anfitrión tenga acceso al torneo."""
+    if ROL_ANFITRION in usuario.roles and torneo.anfitrion_id != usuario.anfitrion_id:
+        raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
 
 
 @router.post("", response_model=TorneoResponse, status_code=201)
@@ -29,7 +35,9 @@ def create_torneo(torneo: TorneoCreate, db: Session = Depends(get_db), usuario=D
 
 @router.get("", response_model=list[TorneoResponse])
 def list_torneos(db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
-    """Listar todos los torneos."""
+    """Listar torneos. Anfitrión ve solo los suyos."""
+    if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
+        return db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()
     return db.query(Torneo).all()
 
 
@@ -39,6 +47,8 @@ def get_torneo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(re
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    if ROL_ANFITRION in usuario.roles and torneo.anfitrion_id != usuario.anfitrion_id:
+        raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
     return torneo
 
 
@@ -48,6 +58,7 @@ def update_torneo(torneo_id: int, torneo_data: TorneoUpdate, db: Session = Depen
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
     for field, value in torneo_data.model_dump(exclude_unset=True).items():
         setattr(torneo, field, value)
     db.commit()
@@ -61,6 +72,7 @@ def create_ubicacion(torneo_id: int, ubicacion: TorneoUbicacionCreate, db: Sessi
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
     db_ubicacion = TorneoUbicacion(torneo_id=torneo_id, **ubicacion.model_dump())
     db.add(db_ubicacion)
     db.commit()
@@ -71,12 +83,20 @@ def create_ubicacion(torneo_id: int, ubicacion: TorneoUbicacionCreate, db: Sessi
 @router.get("/{torneo_id}/ubicaciones", response_model=list[TorneoUbicacionResponse])
 def list_ubicaciones(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar ubicaciones de un torneo."""
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
     return db.query(TorneoUbicacion).filter(TorneoUbicacion.torneo_id == torneo_id).all()
 
 
 @router.put("/{torneo_id}/ubicaciones/{ubicacion_id}", response_model=TorneoUbicacionResponse)
 def update_ubicacion(torneo_id: int, ubicacion_id: int, ubicacion_data: TorneoUbicacionUpdate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Actualizar una ubicación de un torneo."""
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
     ubicacion = db.query(TorneoUbicacion).filter(
         TorneoUbicacion.id == ubicacion_id,
         TorneoUbicacion.torneo_id == torneo_id,
@@ -93,6 +113,10 @@ def update_ubicacion(torneo_id: int, ubicacion_id: int, ubicacion_data: TorneoUb
 @router.delete("/{torneo_id}/ubicaciones/{ubicacion_id}", status_code=204)
 def delete_ubicacion(torneo_id: int, ubicacion_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Eliminar una ubicación de un torneo."""
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
     ubicacion = db.query(TorneoUbicacion).filter(
         TorneoUbicacion.id == ubicacion_id,
         TorneoUbicacion.torneo_id == torneo_id,
@@ -114,6 +138,7 @@ def delete_torneo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
 
     tiene_equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id).first()
     if tiene_equipos:
