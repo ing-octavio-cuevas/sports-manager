@@ -83,13 +83,13 @@ def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario
     """Listar jugadores. Filtrar por equipo_id opcionalmente."""
     from sqlalchemy.orm import joinedload
     query = db.query(Jugador).options(joinedload(Jugador.usuario))
-    # Filtro anfitrión
+    if equipo_id:
+        query = query.filter(Jugador.equipo_id == equipo_id)
+    # Filtro anfitrión: solo ve jugadores de equipos de sus torneos
     if ROL_ANFITRION in usuario.roles and usuario.anfitrion_id:
         torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
         equipos_ids = [e.id for e in db.query(Equipo).filter(Equipo.torneo_id.in_(torneos_ids)).all()]
         query = query.filter(Jugador.equipo_id.in_(equipos_ids))
-    if equipo_id:
-        query = query.filter(Jugador.equipo_id == equipo_id)
     return query.all()
 
 
