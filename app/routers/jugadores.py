@@ -19,6 +19,11 @@ MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 @router.post("", response_model=JugadorResponse, status_code=201)
 def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Crear un nuevo jugador."""
+    from app.models import Usuario
+    from passlib.context import CryptContext
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
     equipo = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
@@ -30,9 +35,44 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
         if jugador.equipo_id not in mis_equipos:
             raise HTTPException(status_code=403, detail="Solo puedes agregar jugadores a tu propio equipo")
 
-    db_jugador = Jugador(**jugador.model_dump())
+    data = jugador.model_dump()
+    email = data.pop("email", None)
+
+    db_jugador = Jugador(**data)
     db_jugador.codigo_qr = f"JUG-{uuid.uuid4().hex[:16].upper()}"
     db.add(db_jugador)
+    db.flush()
+
+    # Si es capitán, crear o vincular usuario
+    if jugador.es_capitan and email:
+        usuario_existente = db.query(Usuario).filter(Usuario.email == email).first()
+        if usuario_existente:
+            # Verificar que no tenga otro jugador en el mismo torneo
+            jugadores_del_usuario = db.query(Jugador).filter(Jugador.usuario_id == usuario_existente.id).all()
+            for j in jugadores_del_usuario:
+                equipo_j = db.query(Equipo).filter(Equipo.id == j.equipo_id).first()
+                if equipo_j and equipo_j.torneo_id == equipo.torneo_id:
+                    raise HTTPException(status_code=400, detail="Este usuario ya tiene un jugador en este torneo")
+            # Agregar rol jugador
+            roles_actuales = set(usuario_existente.roles)
+            roles_actuales.add("jugador")
+            usuario_existente.rol = ",".join(roles_actuales)
+            db_jugador.usuario_id = usuario_existente.id
+        else:
+            # Crear usuario nuevo
+            nuevo_usuario = Usuario(
+                email=email,
+                password_hash=pwd_context.hash("root"),
+                nombre=jugador.nombre,
+                rol="jugador",
+                requiere_cambio_password=True,
+            )
+            db.add(nuevo_usuario)
+            db.flush()
+            db_jugador.usuario_id = nuevo_usuario.id
+    elif jugador.es_capitan and not email:
+        raise HTTPException(status_code=400, detail="Se requiere email para asignar capitán")
+
     db.commit()
     db.refresh(db_jugador)
     return db_jugador

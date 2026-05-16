@@ -132,6 +132,7 @@ class JugadorCreate(BaseModel):
     posicion: Optional[str] = None
     estatus: Optional[bool] = True
     es_capitan: Optional[bool] = False
+    email: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
