@@ -36,7 +36,7 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
             raise HTTPException(status_code=403, detail="Solo puedes agregar jugadores a tu propio equipo")
 
     data = jugador.model_dump()
-    email = data.pop("email", None)
+    celular = data.pop("celular", None)
 
     db_jugador = Jugador(**data)
     db_jugador.codigo_qr = f"JUG-{uuid.uuid4().hex[:16].upper()}"
@@ -44,8 +44,8 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
     db.flush()
 
     # Si es capitán, crear o vincular usuario
-    if jugador.es_capitan and email:
-        usuario_existente = db.query(Usuario).filter(Usuario.email == email).first()
+    if jugador.es_capitan and celular:
+        usuario_existente = db.query(Usuario).filter(Usuario.celular == celular).first()
         if usuario_existente:
             # Verificar que no tenga otro jugador en el mismo torneo
             jugadores_del_usuario = db.query(Jugador).filter(Jugador.usuario_id == usuario_existente.id).all()
@@ -61,7 +61,7 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
         else:
             # Crear usuario nuevo
             nuevo_usuario = Usuario(
-                email=email,
+                celular=celular,
                 password_hash=pwd_context.hash("root"),
                 nombre=jugador.nombre,
                 rol="jugador",
@@ -70,8 +70,8 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
             db.add(nuevo_usuario)
             db.flush()
             db_jugador.usuario_id = nuevo_usuario.id
-    elif jugador.es_capitan and not email:
-        raise HTTPException(status_code=400, detail="Se requiere email para asignar capitán")
+    elif jugador.es_capitan and not celular:
+        raise HTTPException(status_code=400, detail="Se requiere celular para asignar capitán")
 
     db.commit()
     db.refresh(db_jugador)
@@ -126,6 +126,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
     return JugadorInfoCompleta(
         usuario_id=usuario.id,
         nombre=usuario.nombre,
+        celular=usuario.celular,
         email=usuario.email,
         torneos=torneos,
     )
@@ -160,14 +161,14 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
             raise HTTPException(status_code=403, detail="Solo puedes editar jugadores de tu propio equipo")
 
     update_data = jugador_data.model_dump(exclude_unset=True)
-    email = update_data.pop("email", None)
+    celular = update_data.pop("celular", None)
 
     # Si marcan como capitán, crear o vincular usuario
     if "es_capitan" in update_data and update_data["es_capitan"] is True and not jugador.es_capitan:
-        if not email:
-            raise HTTPException(status_code=400, detail="Se requiere email para asignar capitán")
+        if not celular:
+            raise HTTPException(status_code=400, detail="Se requiere celular para asignar capitán")
 
-        usuario_existente = db.query(Usuario).filter(Usuario.email == email).first()
+        usuario_existente = db.query(Usuario).filter(Usuario.celular == celular).first()
         if usuario_existente:
             # Verificar que no tenga otro jugador en el mismo torneo
             equipo_actual = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
@@ -184,7 +185,7 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
         else:
             # Crear usuario nuevo con password temporal
             nuevo_usuario = Usuario(
-                email=email,
+                celular=celular,
                 password_hash=pwd_context.hash("root"),
                 nombre=jugador.nombre,
                 rol="jugador",

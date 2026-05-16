@@ -15,8 +15,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    """Iniciar sesión. Devuelve JWT token."""
-    usuario = db.query(Usuario).filter(Usuario.email == data.email).first()
+    """Iniciar sesión con celular + password."""
+    usuario = db.query(Usuario).filter(Usuario.celular == data.celular).first()
     if not usuario or not pwd_context.verify(data.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     if not usuario.estatus:
@@ -28,6 +28,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         access_token=token,
         usuario=UsuarioResponse(
             id=usuario.id,
+            celular=usuario.celular,
             email=usuario.email,
             nombre=usuario.nombre,
             roles=usuario.roles,

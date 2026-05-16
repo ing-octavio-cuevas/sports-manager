@@ -132,7 +132,7 @@ class JugadorCreate(BaseModel):
     posicion: Optional[str] = None
     estatus: Optional[bool] = True
     es_capitan: Optional[bool] = False
-    email: Optional[str] = None
+    celular: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
@@ -143,7 +143,7 @@ class JugadorUpdate(BaseModel):
     posicion: Optional[str] = None
     estatus: Optional[bool] = None
     es_capitan: Optional[bool] = None
-    email: Optional[str] = None
+    celular: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
@@ -161,6 +161,7 @@ class JugadorResponse(BaseModel):
     curp: Optional[str]
     codigo_qr: str
     usuario_id: Optional[int] = None
+    celular: Optional[str] = None
     email: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -359,15 +360,17 @@ class PartidoCapitanResponse(BaseModel):
 # ─── Usuario ─────────────────────────────────────────────────
 
 class UsuarioCreate(BaseModel):
-    email: str
+    celular: str
+    email: Optional[str] = None
     password: str
     nombre: str
-    roles: list[str]  # ["anfitrion", "arbitro", "jugador"]
-    jugador_id: Optional[int] = None  # ID del jugador a vincular (si es rol jugador)
+    roles: list[str]
+    jugador_id: Optional[int] = None
     anfitrion_id: Optional[int] = None
 
 
 class UsuarioUpdate(BaseModel):
+    celular: Optional[str] = None
     email: Optional[str] = None
     nombre: Optional[str] = None
     roles: Optional[list[str]] = None
@@ -377,7 +380,8 @@ class UsuarioUpdate(BaseModel):
 
 class UsuarioResponse(BaseModel):
     id: int
-    email: str
+    celular: str
+    email: Optional[str]
     nombre: str
     roles: list[str]
     estatus: bool
@@ -396,7 +400,7 @@ class CambiarPassword(BaseModel):
 # ─── Auth ────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
-    email: str
+    celular: str
     password: str
 
 
@@ -436,7 +440,8 @@ class TorneoInfoJugador(BaseModel):
 class JugadorInfoCompleta(BaseModel):
     usuario_id: int
     nombre: str
-    email: str
+    celular: str
+    email: Optional[str] = None
     torneos: list[TorneoInfoJugador] = []
 
 

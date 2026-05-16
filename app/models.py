@@ -96,6 +96,10 @@ class Jugador(Base):
     def email(self):
         return self.usuario.email if self.usuario else None
 
+    @property
+    def celular(self):
+        return self.usuario.celular if self.usuario else None
+
 
 class Jornada(Base):
     __tablename__ = "jornada"
@@ -201,7 +205,8 @@ class Usuario(Base):
     __tablename__ = "usuario"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    celular = Column(String(20), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=True)
     password_hash = Column(String(255), nullable=False)
     nombre = Column(String(255), nullable=False)
     rol = Column(String(200), nullable=False)  # Roles separados por coma: "admin,arbitro,capitan"
@@ -221,4 +226,3 @@ class Usuario(Base):
     # Relaciones
     jugadores = relationship("Jugador", back_populates="usuario")
     anfitrion = relationship("Anfitrion")
-    
