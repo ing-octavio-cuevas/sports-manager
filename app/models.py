@@ -221,3 +221,4 @@ class Usuario(Base):
     # Relaciones
     jugadores = relationship("Jugador", back_populates="usuario")
     anfitrion = relationship("Anfitrion")
+    

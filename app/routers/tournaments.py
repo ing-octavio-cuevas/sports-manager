@@ -104,3 +104,30 @@ def delete_ubicacion(torneo_id: int, ubicacion_id: int, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="No se puede eliminar, la ubicación tiene partidos asignados")
     db.delete(ubicacion)
     db.commit()
+
+
+@router.delete("/{torneo_id}", status_code=204)
+def delete_torneo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """Eliminar un torneo. Solo si no tiene equipos, jornadas ni partidos."""
+    from app.models import Equipo, Jornada
+
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+
+    tiene_equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id).first()
+    if tiene_equipos:
+        raise HTTPException(status_code=400, detail="No se puede eliminar, el torneo tiene equipos")
+
+    tiene_jornadas = db.query(Jornada).filter(Jornada.torneo_id == torneo_id).first()
+    if tiene_jornadas:
+        raise HTTPException(status_code=400, detail="No se puede eliminar, el torneo tiene jornadas")
+
+    tiene_partidos = db.query(Partido).filter(Partido.torneo_id == torneo_id).first()
+    if tiene_partidos:
+        raise HTTPException(status_code=400, detail="No se puede eliminar, el torneo tiene partidos")
+
+    # Eliminar ubicaciones del torneo primero
+    db.query(TorneoUbicacion).filter(TorneoUbicacion.torneo_id == torneo_id).delete()
+    db.delete(torneo)
+    db.commit()
