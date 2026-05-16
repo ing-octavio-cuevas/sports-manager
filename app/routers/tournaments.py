@@ -18,9 +18,10 @@ router = APIRouter(prefix="/torneos", tags=["Torneos"])
 
 
 def _verificar_acceso_torneo(torneo, usuario):
-    """Verifica que el anfitrión tenga acceso al torneo."""
-    if ROL_ANFITRION in usuario.roles and torneo.anfitrion_id != usuario.anfitrion_id:
-        raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
+    """Verifica que el anfitrión tenga acceso al torneo. No bloquea jugadores."""
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles:
+        if torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
 
 
 @router.post("", response_model=TorneoResponse, status_code=201)
@@ -42,13 +43,15 @@ def list_torneos(db: Session = Depends(get_db), usuario=Depends(require_role(ROL
 
 
 @router.get("/{torneo_id}", response_model=TorneoResponse)
-def get_torneo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+def get_torneo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Obtener un torneo por ID."""
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
-    if ROL_ANFITRION in usuario.roles and torneo.anfitrion_id != usuario.anfitrion_id:
-        raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
+    # Solo restringir si es anfitrión puro (sin rol jugador)
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles:
+        if torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
     return torneo
 
 
@@ -86,7 +89,6 @@ def list_ubicaciones(torneo_id: int, db: Session = Depends(get_db), usuario=Depe
     torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
-    _verificar_acceso_torneo(torneo, usuario)
     return db.query(TorneoUbicacion).filter(TorneoUbicacion.torneo_id == torneo_id).all()
 
 
