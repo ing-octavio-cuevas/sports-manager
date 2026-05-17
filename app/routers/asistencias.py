@@ -17,7 +17,11 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
     Obtener los partidos en los que el capitán puede registrar asistencia.
     Incluye es_hoy y caducado para filtrar en el front.
     """
-    from datetime import date
+    from datetime import datetime, timezone, timedelta
+    from app.config import TIMEZONE_OFFSET
+
+    # Zona horaria configurable
+    tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
 
     capitan = db.query(Jugador).filter(
         Jugador.id == capitan_id,
@@ -34,7 +38,7 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
         Partido.estatus != "Jugado",
     ).all()
 
-    hoy = date.today()
+    hoy = datetime.now(tz).date()
     resultado = []
     for p in partidos:
         es_hoy = p.fecha_hora.date() == hoy if p.fecha_hora else False
@@ -77,9 +81,11 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Partido no encontrado")
 
     # Validar que sea el día del partido
-    from datetime import date
+    from datetime import datetime as dt_module, timezone, timedelta
+    from app.config import TIMEZONE_OFFSET
     if partido.fecha_hora:
-        hoy = date.today()
+        tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
+        hoy = dt_module.now(tz).date()
         if partido.fecha_hora.date() != hoy:
             raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia el día del partido")
 

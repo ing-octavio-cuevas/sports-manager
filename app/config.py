@@ -26,6 +26,10 @@ USE_S3 = bool(S3_BUCKET)  # Si no hay bucket configurado, guarda en local
 
 SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-cambiar-en-produccion")
 
+# ─── Zona horaria ────────────────────────────────────────────
+
+TIMEZONE_OFFSET = -6  # México Central (UTC-6)
+
 # ─── Roles ───────────────────────────────────────────────────
 
 ROL_ANFITRION = "anfitrion"
