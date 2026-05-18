@@ -30,6 +30,14 @@ SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-cambiar-en-produccion")
 
 TIMEZONE_OFFSET = -6  # México Central (UTC-6)
 
+# ─── Email SMTP ──────────────────────────────────────────────
+
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "")
+
 # ─── Roles ───────────────────────────────────────────────────
 
 ROL_ANFITRION = "anfitrion"

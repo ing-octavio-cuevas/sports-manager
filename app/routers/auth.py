@@ -7,6 +7,7 @@ from app.models import Usuario
 from app.schemas import LoginRequest, TokenResponse, UsuarioResponse
 from app.auth import create_access_token, get_current_user
 from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -57,3 +58,110 @@ def cambiar_password(data: CambiarPasswordRequest, db: Session = Depends(get_db)
     usuario.requiere_cambio_password = False
     db.commit()
     return {"detail": "Contraseña actualizada"}
+
+
+# ─── Recuperar contraseña ────────────────────────────────────
+
+import random
+import string
+from datetime import datetime, timedelta, timezone
+from app.config import TIMEZONE_OFFSET
+
+
+class RecuperarPasswordRequest(BaseModel):
+    celular: Optional[str] = None
+    email: Optional[str] = None
+
+
+class VerificarCodigoRequest(BaseModel):
+    celular: Optional[str] = None
+    email: Optional[str] = None
+    codigo: str
+    new_password: str
+
+
+# Almacén temporal de códigos (en producción usar Redis o BD)
+_codigos_reset = {}
+
+
+@router.post("/recuperar-password", status_code=200)
+def recuperar_password(data: RecuperarPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Solicitar recuperación de contraseña.
+    Envía un código de 6 dígitos al email del usuario.
+    """
+    if not data.celular and not data.email:
+        raise HTTPException(status_code=400, detail="Debes proporcionar celular o email")
+
+    # Buscar usuario
+    if data.celular:
+        usuario = db.query(Usuario).filter(Usuario.celular == data.celular).first()
+    else:
+        usuario = db.query(Usuario).filter(Usuario.email == data.email).first()
+
+    if not usuario:
+        # No revelar si el usuario existe o no
+        return {"detail": "Si el dato es correcto, recibirás un código en tu correo"}
+
+    if not usuario.email:
+        raise HTTPException(status_code=400, detail="El usuario no tiene email registrado para recuperación")
+
+    # Generar código de 6 dígitos
+    codigo = ''.join(random.choices(string.digits, k=6))
+
+    # Guardar código con expiración (15 minutos)
+    tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
+    _codigos_reset[usuario.id] = {
+        "codigo": codigo,
+        "expira": datetime.now(tz) + timedelta(minutes=15),
+    }
+
+    # Enviar email
+    from app.email_service import send_reset_code
+    try:
+        send_reset_code(usuario.email, usuario.nombre, codigo)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al enviar el correo")
+
+    return {"detail": "Si el dato es correcto, recibirás un código en tu correo"}
+
+
+@router.post("/verificar-codigo-reset", status_code=200)
+def verificar_codigo_reset(data: VerificarCodigoRequest, db: Session = Depends(get_db)):
+    """
+    Verificar código y cambiar contraseña.
+    """
+    if not data.celular and not data.email:
+        raise HTTPException(status_code=400, detail="Debes proporcionar celular o email")
+
+    # Buscar usuario
+    if data.celular:
+        usuario = db.query(Usuario).filter(Usuario.celular == data.celular).first()
+    else:
+        usuario = db.query(Usuario).filter(Usuario.email == data.email).first()
+
+    if not usuario:
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+
+    # Verificar código
+    reset_data = _codigos_reset.get(usuario.id)
+    if not reset_data:
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+
+    tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
+    if reset_data["codigo"] != data.codigo:
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+
+    if datetime.now(tz) > reset_data["expira"]:
+        del _codigos_reset[usuario.id]
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+
+    # Cambiar contraseña
+    usuario.password_hash = pwd_context.hash(data.new_password)
+    usuario.requiere_cambio_password = False
+    db.commit()
+
+    # Limpiar código usado
+    del _codigos_reset[usuario.id]
+
+    return {"detail": "Contraseña actualizada exitosamente"}
