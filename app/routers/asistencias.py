@@ -34,8 +34,7 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
         or_(
             Partido.equipo_local_id == capitan.equipo_id,
             Partido.equipo_visitante_id == capitan.equipo_id,
-        ),
-        Partido.estatus != "Jugado",
+        )
     ).all()
 
     hoy = datetime.now(tz).date()
