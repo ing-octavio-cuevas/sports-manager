@@ -139,7 +139,6 @@ class JugadorCreate(BaseModel):
 
 class JugadorUpdate(BaseModel):
     nombre: Optional[str] = None
-    numero: Optional[int] = None
     posicion: Optional[str] = None
     estatus: Optional[bool] = None
     es_capitan: Optional[bool] = None

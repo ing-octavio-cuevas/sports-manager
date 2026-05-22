@@ -34,7 +34,8 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
         or_(
             Partido.equipo_local_id == capitan.equipo_id,
             Partido.equipo_visitante_id == capitan.equipo_id,
-        )
+        ),
+        Partido.tipo == "Oficial",
     ).all()
 
     hoy = datetime.now(tz).date()
@@ -78,6 +79,10 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    # Solo partidos oficiales permiten registro de asistencia
+    if partido.tipo != "Oficial":
+        raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia en partidos oficiales")
 
     # Validar que sea el día del partido
     from datetime import datetime as dt_module, timezone, timedelta
@@ -197,17 +202,23 @@ def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends
 @router.get("/partido/{partido_id}", response_model=list[AsistenciaResponse])
 def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """Listar asistencias de un partido."""
+    from datetime import timezone, timedelta
+    from app.config import TIMEZONE_OFFSET
+
+    tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
     asistencias = db.query(Asistencia).filter(Asistencia.partido_id == partido_id).all()
     resultado = []
     for a in asistencias:
         jugador = db.query(Jugador).filter(Jugador.id == a.jugador_id).first()
+        # Convertir hora_registro a zona horaria local
+        hora_local = a.hora_registro.replace(tzinfo=timezone.utc).astimezone(tz) if a.hora_registro else None
         resultado.append(AsistenciaResponse(
             id=a.id,
             partido_id=a.partido_id,
             jugador_id=a.jugador_id,
             registrado_por=a.registrado_por,
             metodo=a.metodo,
-            hora_registro=a.hora_registro,
+            hora_registro=hora_local,
             jugador_nombre=jugador.nombre if jugador else None,
             jugador_numero=jugador.numero if jugador else None,
             jugador_foto=jugador.foto if jugador else None,

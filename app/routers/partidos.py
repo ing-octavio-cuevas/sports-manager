@@ -203,6 +203,7 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
     partidos = db.query(Partido).filter(
         Partido.torneo_id == torneo_id,
         Partido.estatus == "Jugado",
+        Partido.tipo == "Oficial",
     ).all()
 
     # Inicializar stats por equipo
