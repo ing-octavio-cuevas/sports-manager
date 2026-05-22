@@ -155,10 +155,11 @@ def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
 
-    # Total de partidos del equipo en el torneo con estatus "Jugado"
+    # Total de partidos del equipo en el torneo con estatus "Jugado" y tipo "Oficial"
     partidos = db.query(Partido).filter(
         Partido.torneo_id == torneo_id,
         Partido.estatus == "Jugado",
+        Partido.tipo == "Oficial",
         or_(
             Partido.equipo_local_id == equipo_id,
             Partido.equipo_visitante_id == equipo_id,
