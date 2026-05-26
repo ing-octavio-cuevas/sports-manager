@@ -49,6 +49,15 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
     email = data.pop("email", None)
 
     db_jugador = Jugador(**data)
+
+    # Validar nombre duplicado en el mismo equipo
+    existe = db.query(Jugador).filter(
+        Jugador.equipo_id == jugador.equipo_id,
+        Jugador.nombre == jugador.nombre,
+    ).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya existe un jugador con ese nombre en este equipo")
+
     db_jugador.codigo_qr = f"JUG-{uuid.uuid4().hex[:16].upper()}"
     db.add(db_jugador)
     db.flush()
