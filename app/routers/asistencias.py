@@ -11,11 +11,12 @@ from app.config import ROL_ANFITRION, ROL_JUGADOR
 router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
 
+@router.get("/mis-partidos", response_model=list[PartidoCapitanResponse])
 @router.get("/capitan/{capitan_id}/partidos", response_model=list[PartidoCapitanResponse])
-def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR)), capitan_id: int = None):
     """
-    Obtener los partidos en los que el capitán puede registrar asistencia.
-    Incluye jornada, ubicación, estado de asistencia, es_hoy y caducado.
+    Obtener todos los partidos donde el usuario logueado es capitán.
+    Busca todos sus jugadores capitanes y devuelve partidos de todos sus equipos.
     """
     from datetime import datetime, timezone, timedelta
     from app.config import TIMEZONE_OFFSET
@@ -23,17 +24,22 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
 
     tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
 
-    capitan = db.query(Jugador).filter(
-        Jugador.id == capitan_id,
+    # Buscar todos los jugadores capitanes de este usuario
+    capitanes = db.query(Jugador).filter(
+        Jugador.usuario_id == usuario.id,
         Jugador.es_capitan == True,
-    ).first()
-    if not capitan:
-        raise HTTPException(status_code=404, detail="Capitán no encontrado")
+    ).all()
+    if not capitanes:
+        return []
+
+    # Obtener equipos de todos sus capitanes
+    equipos_ids = [c.equipo_id for c in capitanes]
+    capitan_por_equipo = {c.equipo_id: c.id for c in capitanes}
 
     partidos = db.query(Partido).filter(
         or_(
-            Partido.equipo_local_id == capitan.equipo_id,
-            Partido.equipo_visitante_id == capitan.equipo_id,
+            Partido.equipo_local_id.in_(equipos_ids),
+            Partido.equipo_visitante_id.in_(equipos_ids),
         ),
         Partido.tipo == "Oficial",
     ).all()
@@ -50,7 +56,10 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
         # Ubicación info
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
-        # Verificar si este capitán ya registró asistencia
+        # Determinar cuál capitán corresponde a este partido
+        capitan_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
+
+        # Verificar si ya registró asistencia
         ya_registro = db.query(Asistencia).filter(
             Asistencia.partido_id == p.id,
             Asistencia.registrado_por == capitan_id,
