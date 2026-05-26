@@ -15,12 +15,12 @@ router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """
     Obtener los partidos en los que el capitán puede registrar asistencia.
-    Incluye es_hoy y caducado para filtrar en el front.
+    Incluye jornada, ubicación, estado de asistencia, es_hoy y caducado.
     """
     from datetime import datetime, timezone, timedelta
     from app.config import TIMEZONE_OFFSET
+    from app.models import Jornada, TorneoUbicacion
 
-    # Zona horaria configurable
     tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
 
     capitan = db.query(Jugador).filter(
@@ -43,18 +43,36 @@ def get_partidos_capitan(capitan_id: int, db: Session = Depends(get_db), usuario
     for p in partidos:
         es_hoy = p.fecha_hora.date() == hoy if p.fecha_hora else False
         caducado = p.fecha_hora.date() < hoy if p.fecha_hora else False
+
+        # Jornada info
+        jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
+
+        # Ubicación info
+        ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
+
+        # Verificar si este capitán ya registró asistencia
+        ya_registro = db.query(Asistencia).filter(
+            Asistencia.partido_id == p.id,
+            Asistencia.registrado_por == capitan_id,
+        ).first()
+
         resultado.append(PartidoCapitanResponse(
             id=p.id,
             torneo_id=p.torneo_id,
             jornada_id=p.jornada_id,
+            jornada_numero=jornada.numero if jornada else None,
+            jornada_fecha=jornada.fecha if jornada else None,
             equipo_local_id=p.equipo_local_id,
             equipo_visitante_id=p.equipo_visitante_id,
             estatus=p.estatus,
             tipo=p.tipo,
             ubicacion_id=p.ubicacion_id,
+            ubicacion_nombre=ubicacion.nombre if ubicacion else None,
+            ubicacion_direccion=ubicacion.direccion if ubicacion else None,
             fecha_hora=p.fecha_hora,
             es_hoy=es_hoy,
             caducado=caducado,
+            asistencia_registrada=ya_registro is not None,
         ))
 
     return resultado

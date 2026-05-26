@@ -3,6 +3,11 @@ Configuración de la base de datos PostgreSQL y AWS.
 Modifica estos valores según tu entorno local.
 """
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Carga variables desde .env o .env.example
+if not os.getenv("S3_BUCKET"):
+    load_dotenv(".env.example")
 from urllib.parse import quote_plus
 
 # ─── Base de datos ───────────────────────────────────────────

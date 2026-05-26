@@ -1,10 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 
 from app.database import engine, Base
 from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, partidos, partido_arbitraje, partido_sets, asistencias, usuarios, auth
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Crear las tablas en la BD al iniciar (si no existen)
 # Base.metadata.create_all(bind=engine)
@@ -13,6 +19,8 @@ from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, 
 os.makedirs("uploads", exist_ok=True)
 
 app = FastAPI(title="Torneos API", version="0.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — permite que tu front local consuma la API sin problemas
 app.add_middleware(

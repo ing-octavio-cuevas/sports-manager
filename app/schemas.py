@@ -133,6 +133,7 @@ class JugadorCreate(BaseModel):
     estatus: Optional[bool] = True
     es_capitan: Optional[bool] = False
     celular: Optional[str] = None
+    email: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
@@ -143,6 +144,7 @@ class JugadorUpdate(BaseModel):
     estatus: Optional[bool] = None
     es_capitan: Optional[bool] = None
     celular: Optional[str] = None
+    email: Optional[str] = None
     foto: Optional[str] = None
     curp: Optional[str] = None
 
@@ -344,14 +346,19 @@ class PartidoCapitanResponse(BaseModel):
     id: int
     torneo_id: int
     jornada_id: int
+    jornada_numero: Optional[int] = None
+    jornada_fecha: Optional[datetime] = None
     equipo_local_id: int
     equipo_visitante_id: int
     estatus: Optional[str]
     tipo: Optional[str]
     ubicacion_id: Optional[int]
+    ubicacion_nombre: Optional[str] = None
+    ubicacion_direccion: Optional[str] = None
     fecha_hora: Optional[datetime]
     es_hoy: bool = False
     caducado: bool = False
+    asistencia_registrada: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -474,3 +481,43 @@ class AsistenciaResumenEquipo(BaseModel):
     torneo_id: int
     total_partidos: int
     jugadores: list[AsistenciaResumenJugador] = []
+
+
+# ─── Resumen completo de torneo ──────────────────────────────
+
+class TorneoResumenInfo(BaseModel):
+    id: int
+    nombre: str
+    periodo: Optional[str]
+    categoria: Optional[str]
+    logo: Optional[str]
+
+
+class JugadorAsistenciaInfo(BaseModel):
+    jugador_id: int
+    nombre: str
+    numero: Optional[int]
+    foto: Optional[str]
+
+
+class AsistenciaResumenPartido(BaseModel):
+    partido_id: int
+    jornada_numero: Optional[int] = None
+    fecha: Optional[datetime]
+    rival: str
+    jugadores_presentes: list[JugadorAsistenciaInfo] = []
+    total_jugadores: int
+
+
+class EquipoResumenCompleto(BaseModel):
+    id: int
+    nombre: str
+    logo: Optional[str]
+    jugadores: list[JugadorResponse] = []
+    ultimas_asistencias: list[AsistenciaResumenPartido] = []
+
+
+class TorneoResumenCompleto(BaseModel):
+    torneo: TorneoResumenInfo
+    tabla_posiciones: list[PosicionEquipo] = []
+    equipos: list[EquipoResumenCompleto] = []

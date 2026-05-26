@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: IAM User for V-SportManager S3 access (local development)
+
+Resources:
+  DevUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: vsportmanager-dev
+      Policies:
+        - PolicyName: S3FullAccessBucket
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::vsportmanager-fotos-*
+                  - arn:aws:s3:::vsportmanager-fotos-*/*
+
+  DevUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref DevUser
+
+Outputs:
+  AccessKeyId:
+    Description: Access Key ID
+    Value: !Ref DevUserAccessKey
+  SecretAccessKey:
+    Description: Secret Access Key (solo visible en la creación)
+    Value: !GetAtt DevUserAccessKey.SecretAccessKey
