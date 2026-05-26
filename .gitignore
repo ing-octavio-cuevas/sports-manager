@@ -6,3 +6,4 @@ uploads/
 .idea/
 .env
 .env.example
+vsportmanager-key.pem
