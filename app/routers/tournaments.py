@@ -238,6 +238,9 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
 
+    if not torneo.publicado:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+
     # Info del torneo
     torneo_info = TorneoResumenInfo(
         id=torneo.id,
