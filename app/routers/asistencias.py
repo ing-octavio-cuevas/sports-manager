@@ -91,17 +91,8 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
 def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """
     Registrar asistencia en lote del equipo contrario.
-    El capitán envía la lista completa de jugadores presentes.
-    Una vez enviada, no se puede volver a registrar para ese partido/capitán.
+    Determina automáticamente qué jugador capitán del usuario corresponde al partido.
     """
-    # Verificar que quien registra es capitán
-    capitan = db.query(Jugador).filter(
-        Jugador.id == data.registrado_por,
-        Jugador.es_capitan == True,
-    ).first()
-    if not capitan:
-        raise HTTPException(status_code=403, detail="Solo un capitán puede registrar asistencia")
-
     # Verificar partido
     partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
     if not partido:
@@ -120,14 +111,20 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
         if partido.fecha_hora.date() != hoy:
             raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia el día del partido")
 
-    # Validar que el capitán pertenece a uno de los equipos del partido
-    if capitan.equipo_id not in [partido.equipo_local_id, partido.equipo_visitante_id]:
-        raise HTTPException(status_code=400, detail="El capitán no pertenece a este partido")
+    # Buscar el capitán del usuario que pertenece a este partido
+    capitanes = db.query(Jugador).filter(
+        Jugador.usuario_id == usuario.id,
+        Jugador.es_capitan == True,
+        Jugador.equipo_id.in_([partido.equipo_local_id, partido.equipo_visitante_id]),
+    ).first()
+    if not capitanes:
+        raise HTTPException(status_code=403, detail="No eres capitán de ningún equipo en este partido")
+    capitan = capitanes
 
     # Verificar si ya se registró asistencia por este capitán para este partido
     ya_registro = db.query(Asistencia).filter(
         Asistencia.partido_id == data.partido_id,
-        Asistencia.registrado_por == data.registrado_por,
+        Asistencia.registrado_por == capitan.id,
     ).first()
     if ya_registro:
         raise HTTPException(status_code=400, detail="Ya se registró asistencia para este partido. No se puede modificar")
@@ -150,7 +147,7 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
         db_asistencia = Asistencia(
             partido_id=data.partido_id,
             jugador_id=jugador_id,
-            registrado_por=data.registrado_por,
+            registrado_por=capitan.id,
             metodo="manual",
         )
         db.add(db_asistencia)

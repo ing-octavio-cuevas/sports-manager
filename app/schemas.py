@@ -324,7 +324,6 @@ class PosicionEquipo(BaseModel):
 class AsistenciaCreate(BaseModel):
     partido_id: int
     jugador_ids: list[int]
-    registrado_por: int  # ID del capitán
 
 
 class AsistenciaResponse(BaseModel):

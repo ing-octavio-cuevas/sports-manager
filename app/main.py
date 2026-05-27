@@ -51,4 +51,3 @@ app.include_router(auth.router)
 
 # Servir archivos estáticos (fotos)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-# Mensaje de prueba 2
