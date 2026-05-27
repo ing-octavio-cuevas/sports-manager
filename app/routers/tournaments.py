@@ -336,16 +336,11 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                         foto=jug.foto,
                     ))
 
-            # Convertir fecha a CDMX
-            from datetime import timezone as tz_mod, timedelta
-            from app.config import TIMEZONE_OFFSET
-            tz_local = tz_mod(timedelta(hours=TIMEZONE_OFFSET))
-            fecha_local = p.fecha_hora.replace(tzinfo=tz_mod.utc).astimezone(tz_local) if p.fecha_hora else None
-
+            # Fecha del partido (ya está en hora local)
             ultimas_asistencias.append(AsistenciaResumenPartido(
                 partido_id=p.id,
                 jornada_numero=jornada_p.numero if jornada_p else None,
-                fecha=fecha_local,
+                fecha=p.fecha_hora,
                 rival=rival.nombre if rival else "Desconocido",
                 jugadores_presentes=jugadores_presentes,
                 total_jugadores=total_jugadores,
