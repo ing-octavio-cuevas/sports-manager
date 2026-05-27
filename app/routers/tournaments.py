@@ -253,7 +253,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
     # Partidos oficiales jugados
     partidos_jugados = db.query(Partido).filter(
         Partido.torneo_id == torneo_id,
-        Partido.estatus == "Jugado",
+        # Partido.estatus == "Jugado",
         Partido.tipo == "Oficial",
     ).all()
 
