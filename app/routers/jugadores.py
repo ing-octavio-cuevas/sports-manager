@@ -161,6 +161,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
         torneos.append(TorneoInfoJugador(
             torneo_id=torneo.id,
             torneo_nombre=torneo.nombre,
+            torneo_logo=torneo.logo,
             equipo_id=equipo.id,
             equipo_nombre=equipo.nombre,
             jugador_id=jugador.id,

@@ -436,6 +436,7 @@ class PartidoInfoJugador(BaseModel):
 class TorneoInfoJugador(BaseModel):
     torneo_id: int
     torneo_nombre: str
+    torneo_logo: Optional[str] = None
     equipo_id: int
     equipo_nombre: str
     jugador_id: int
