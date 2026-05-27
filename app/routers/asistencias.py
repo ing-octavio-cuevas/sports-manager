@@ -36,12 +36,18 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
     equipos_ids = [c.equipo_id for c in capitanes]
     capitan_por_equipo = {c.equipo_id: c.id for c in capitanes}
 
+    from app.models import Torneo as TorneoModel
+
+    # Obtener torneos publicados
+    torneos_publicados = [t.id for t in db.query(TorneoModel).filter(TorneoModel.publicado == True).all()]
+
     partidos = db.query(Partido).filter(
         or_(
             Partido.equipo_local_id.in_(equipos_ids),
             Partido.equipo_visitante_id.in_(equipos_ids),
         ),
         Partido.tipo == "Oficial",
+        Partido.torneo_id.in_(torneos_publicados),
     ).all()
 
     hoy = datetime.now(tz).date()
