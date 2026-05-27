@@ -27,8 +27,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:3000",
         "https://tornealo-sports.com",
-        "https://d2rjzmmh7o8p9e.cloudfront.net/login",
+        "https://www.tornealo-sports.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
