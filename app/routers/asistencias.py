@@ -108,6 +108,12 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     if partido.tipo != "Oficial":
         raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia en partidos oficiales")
 
+    # No permitir asistencias en torneos no publicados
+    from app.models import Torneo as TorneoCheck
+    torneo_partido = db.query(TorneoCheck).filter(TorneoCheck.id == partido.torneo_id).first()
+    if not torneo_partido or not torneo_partido.publicado:
+        raise HTTPException(status_code=400, detail="No se puede registrar asistencia en un torneo no publicado")
+
     # Validar que sea el día del partido
     from datetime import datetime as dt_module, timezone, timedelta
     from app.config import TIMEZONE_OFFSET
