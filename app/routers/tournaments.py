@@ -302,10 +302,9 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             Jugador.equipo_id == equipo.id
         ).all()
 
-        # Últimas 4 asistencias del equipo
+        # Últimas 4 asistencias del equipo (oficiales y amistosos)
         partidos_equipo = db.query(Partido).filter(
             Partido.torneo_id == torneo_id,
-            Partido.tipo == "Oficial",
             or_(
                 Partido.equipo_local_id == equipo.id,
                 Partido.equipo_visitante_id == equipo.id,
