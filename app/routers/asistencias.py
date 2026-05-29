@@ -46,7 +46,6 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
             Partido.equipo_local_id.in_(equipos_ids),
             Partido.equipo_visitante_id.in_(equipos_ids),
         ),
-        Partido.tipo == "Oficial",
         Partido.torneo_id.in_(torneos_publicados),
     ).all()
 
@@ -103,10 +102,6 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
-
-    # Solo partidos oficiales permiten registro de asistencia
-    if partido.tipo != "Oficial":
-        raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia en partidos oficiales")
 
     # No permitir asistencias en torneos no publicados
     from app.models import Torneo as TorneoCheck
