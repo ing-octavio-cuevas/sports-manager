@@ -264,6 +264,7 @@ class PartidoResponse(BaseModel):
     tipo: Optional[str]
     observaciones: Optional[str]
     sets: list["PartidoSetResponse"] = []
+    arbitrajes: list["PartidoArbitrajeResponse"] = []
 
     model_config = {"from_attributes": True}
 

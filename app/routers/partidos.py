@@ -42,7 +42,8 @@ def list_partidos(
     usuario=Depends(require_role(ROL_ANFITRION)),
 ):
     """Listar partidos. Filtrar por torneo_id y/o jornada_id."""
-    query = db.query(Partido)
+    from sqlalchemy.orm import joinedload
+    query = db.query(Partido).options(joinedload(Partido.arbitrajes), joinedload(Partido.sets))
     # Filtro anfitrión
     if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
         torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
