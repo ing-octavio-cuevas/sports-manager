@@ -48,6 +48,10 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
     celular = data.pop("celular", None)
     email = data.pop("email", None)
 
+    # Tratar numero 0 como null
+    if data.get("numero") == 0:
+        data["numero"] = None
+
     db_jugador = Jugador(**data)
 
     # Validar nombre duplicado en el mismo equipo
@@ -233,9 +237,11 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
         celular = None
         email = None
 
-    # Numero solo se puede asignar si actualmente es null
+    # Numero solo se puede asignar si actualmente es null o es el mismo valor
     if "numero" in update_data:
-        if jugador.numero is not None:
+        if update_data["numero"] == 0:
+            update_data["numero"] = None
+        elif jugador.numero is not None and update_data["numero"] != jugador.numero:
             raise HTTPException(status_code=400, detail="El número de jugador no se puede modificar una vez asignado")
         # Validar que no exista otro con ese número en el equipo
         existe_numero = db.query(Jugador).filter(

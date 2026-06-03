@@ -309,6 +309,13 @@ class CombinacionPartido(BaseModel):
 
 # ─── Tabla de posiciones ─────────────────────────────────────
 
+class AdeudoEquipo(BaseModel):
+    partido_id: int
+    rival: str
+    monto: Optional[float]
+    fecha_partido: Optional[datetime]
+
+
 class PosicionEquipo(BaseModel):
     equipo_id: int
     equipo_nombre: str
@@ -318,6 +325,9 @@ class PosicionEquipo(BaseModel):
     sg: int = 0   # Sets ganados
     sp: int = 0   # Sets perdidos
     pts: int = 0  # Puntos
+    inscripcion_pagada: bool = False
+    monto_pagado: Optional[float] = None
+    adeudos: list[AdeudoEquipo] = []
 
 
 # ─── Asistencia ──────────────────────────────────────────────

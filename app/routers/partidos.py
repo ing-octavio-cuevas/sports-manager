@@ -260,4 +260,39 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
 
     # Ordenar por puntos desc, luego por sets ganados desc
     tabla = sorted(stats.values(), key=lambda x: (-x["pts"], -x["sg"]))
-    return [PosicionEquipo(**row) for row in tabla]
+
+    # Agregar inscripción y adeudos por equipo
+    from app.models import PartidoArbitraje
+    from app.schemas import AdeudoEquipo
+
+    resultado = []
+    for row in tabla:
+        equipo = next(e for e in equipos if e.id == row["equipo_id"])
+
+        # Adeudos: arbitrajes no pagados de este equipo
+        adeudos_db = db.query(PartidoArbitraje).filter(
+            PartidoArbitraje.equipo_id == equipo.id,
+            PartidoArbitraje.pagado == False,
+        ).all()
+
+        adeudos = []
+        for a in adeudos_db:
+            partido_a = db.query(Partido).filter(Partido.id == a.partido_id).first()
+            if partido_a and partido_a.torneo_id == torneo_id:
+                rival_id = partido_a.equipo_visitante_id if partido_a.equipo_local_id == equipo.id else partido_a.equipo_local_id
+                rival = next((e.nombre for e in equipos if e.id == rival_id), "Desconocido")
+                adeudos.append(AdeudoEquipo(
+                    partido_id=partido_a.id,
+                    rival=rival,
+                    monto=float(a.monto) if a.monto else None,
+                    fecha_partido=partido_a.fecha_hora,
+                ))
+
+        resultado.append(PosicionEquipo(
+            **row,
+            inscripcion_pagada=equipo.inscripcion_pagada,
+            monto_pagado=float(equipo.monto_pagado) if equipo.monto_pagado else None,
+            adeudos=adeudos,
+        ))
+
+    return resultado
