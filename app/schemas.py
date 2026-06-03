@@ -140,6 +140,7 @@ class JugadorCreate(BaseModel):
 
 class JugadorUpdate(BaseModel):
     nombre: Optional[str] = None
+    numero: Optional[int] = None
     posicion: Optional[str] = None
     estatus: Optional[bool] = None
     es_capitan: Optional[bool] = None
@@ -344,6 +345,7 @@ class PartidoCapitanResponse(BaseModel):
     """Partidos disponibles para que el capitán registre asistencia."""
     id: int
     torneo_id: int
+    torneo_nombre: Optional[str] = None
     jornada_id: int
     jornada_numero: Optional[int] = None
     jornada_fecha: Optional[datetime] = None

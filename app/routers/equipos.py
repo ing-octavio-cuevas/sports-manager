@@ -16,6 +16,13 @@ def create_equipo(equipo: EquipoCreate, db: Session = Depends(get_db), usuario=D
     torneo = db.query(Torneo).filter(Torneo.id == equipo.torneo_id).first()
     if not torneo:
         raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    # Validar nombre duplicado en el mismo torneo
+    existe = db.query(Equipo).filter(
+        Equipo.torneo_id == equipo.torneo_id,
+        Equipo.nombre == equipo.nombre,
+    ).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya existe un equipo con ese nombre en este torneo")
     db_equipo = Equipo(**equipo.model_dump())
     db.add(db_equipo)
     db.commit()
@@ -62,12 +69,27 @@ def update_equipo(equipo_id: int, equipo_data: EquipoUpdate, db: Session = Depen
 
 @router.delete("/{equipo_id}", status_code=204)
 def delete_equipo(equipo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
-    """Soft delete — desactiva el equipo."""
+    """Eliminar equipo si no tiene nada asociado, sino soft delete."""
+    from app.models import Jugador, Partido
+    from sqlalchemy import or_
+
     equipo = db.query(Equipo).filter(Equipo.id == equipo_id).first()
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
-    equipo.estatus = False
-    db.commit()
+
+    # Verificar si tiene jugadores
+    tiene_jugadores = db.query(Jugador).filter(Jugador.equipo_id == equipo_id).first()
+    # Verificar si tiene partidos
+    tiene_partidos = db.query(Partido).filter(
+        or_(Partido.equipo_local_id == equipo_id, Partido.equipo_visitante_id == equipo_id)
+    ).first()
+
+    if tiene_jugadores or tiene_partidos:
+        equipo.estatus = False
+        db.commit()
+    else:
+        db.delete(equipo)
+        db.commit()
 
 
 # ─── Upload de logo del equipo ───────────────────────────────

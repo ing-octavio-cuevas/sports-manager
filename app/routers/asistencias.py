@@ -58,6 +58,9 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
         # Jornada info
         jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
 
+        # Torneo info
+        torneo_p = db.query(TorneoModel).filter(TorneoModel.id == p.torneo_id).first()
+
         # Ubicación info
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
@@ -73,6 +76,7 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
         resultado.append(PartidoCapitanResponse(
             id=p.id,
             torneo_id=p.torneo_id,
+            torneo_nombre=torneo_p.nombre if torneo_p else None,
             jornada_id=p.jornada_id,
             jornada_numero=jornada.numero if jornada else None,
             jornada_fecha=jornada.fecha if jornada else None,

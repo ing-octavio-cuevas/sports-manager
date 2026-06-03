@@ -58,6 +58,15 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
     if existe:
         raise HTTPException(status_code=400, detail="Ya existe un jugador con ese nombre en este equipo")
 
+    # Validar número duplicado en el mismo equipo
+    if jugador.numero is not None:
+        existe_numero = db.query(Jugador).filter(
+            Jugador.equipo_id == jugador.equipo_id,
+            Jugador.numero == jugador.numero,
+        ).first()
+        if existe_numero:
+            raise HTTPException(status_code=400, detail="Ya existe un jugador con ese número en este equipo")
+
     db_jugador.codigo_qr = f"JUG-{uuid.uuid4().hex[:16].upper()}"
     db.add(db_jugador)
     db.flush()
@@ -218,6 +227,24 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
     update_data = jugador_data.model_dump(exclude_unset=True)
     celular = update_data.pop("celular", None)
     email = update_data.pop("email", None)
+
+    # Si viene es_capitan=false, ignorar celular y email
+    if "es_capitan" in update_data and update_data["es_capitan"] is False:
+        celular = None
+        email = None
+
+    # Numero solo se puede asignar si actualmente es null
+    if "numero" in update_data:
+        if jugador.numero is not None:
+            raise HTTPException(status_code=400, detail="El número de jugador no se puede modificar una vez asignado")
+        # Validar que no exista otro con ese número en el equipo
+        existe_numero = db.query(Jugador).filter(
+            Jugador.equipo_id == jugador.equipo_id,
+            Jugador.numero == update_data["numero"],
+            Jugador.id != jugador_id,
+        ).first()
+        if existe_numero:
+            raise HTTPException(status_code=400, detail="Ya existe un jugador con ese número en este equipo")
 
     # Si marcan como capitán, validar que no haya otro
     if "es_capitan" in update_data and update_data["es_capitan"] is True and not jugador.es_capitan:
