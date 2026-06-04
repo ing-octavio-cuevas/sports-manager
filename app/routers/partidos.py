@@ -195,8 +195,8 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
         if torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
 
-    # Equipos del torneo
-    equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id).all()
+    # Equipos del torneo (solo activos)
+    equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id, Equipo.estatus == True).all()
     if not equipos:
         return []
 
