@@ -367,6 +367,7 @@ class PartidoCapitanResponse(BaseModel):
     ubicacion_id: Optional[int]
     ubicacion_nombre: Optional[str] = None
     ubicacion_direccion: Optional[str] = None
+    ubicacion_url: Optional[str] = None
     fecha_hora: Optional[datetime]
     es_hoy: bool = False
     caducado: bool = False

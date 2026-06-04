@@ -87,6 +87,7 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
             ubicacion_id=p.ubicacion_id,
             ubicacion_nombre=ubicacion.nombre if ubicacion else None,
             ubicacion_direccion=ubicacion.direccion if ubicacion else None,
+            ubicacion_url=ubicacion.ubicacion if ubicacion else None,
             fecha_hora=p.fecha_hora,
             es_hoy=es_hoy,
             caducado=caducado,
