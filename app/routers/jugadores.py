@@ -241,16 +241,17 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
     if "numero" in update_data:
         if update_data["numero"] == 0:
             update_data["numero"] = None
-        elif jugador.numero is not None and update_data["numero"] != jugador.numero:
-            raise HTTPException(status_code=400, detail="El número de jugador no se puede modificar una vez asignado")
-        # Validar que no exista otro con ese número en el equipo
-        existe_numero = db.query(Jugador).filter(
-            Jugador.equipo_id == jugador.equipo_id,
-            Jugador.numero == update_data["numero"],
-            Jugador.id != jugador_id,
-        ).first()
-        if existe_numero:
-            raise HTTPException(status_code=400, detail="Ya existe un jugador con ese número en este equipo")
+        elif update_data["numero"] is not None:
+            if jugador.numero is not None and update_data["numero"] != jugador.numero:
+                raise HTTPException(status_code=400, detail="El número de jugador no se puede modificar una vez asignado")
+            # Validar que no exista otro con ese número en el equipo
+            existe_numero = db.query(Jugador).filter(
+                Jugador.equipo_id == jugador.equipo_id,
+                Jugador.numero == update_data["numero"],
+                Jugador.id != jugador_id,
+            ).first()
+            if existe_numero:
+                raise HTTPException(status_code=400, detail="Ya existe un jugador con ese número en este equipo")
 
     # Si marcan como capitán, validar que no haya otro
     if "es_capitan" in update_data and update_data["es_capitan"] is True and not jugador.es_capitan:
