@@ -250,8 +250,8 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
         logo=torneo.logo,
     )
 
-    # Equipos del torneo
-    equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id).all()
+    # Equipos del torneo (solo activos)
+    equipos = db.query(Equipo).filter(Equipo.torneo_id == torneo_id, Equipo.estatus == True).all()
 
     # Partidos oficiales jugados
     partidos_jugados = db.query(Partido).filter(
