@@ -213,6 +213,7 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
         stats[equipo.id] = {
             "equipo_id": equipo.id,
             "equipo_nombre": equipo.nombre,
+            "equipo_logo": equipo.logo,
             "pj": 0,
             "pg": 0,
             "pp": 0,

@@ -320,6 +320,7 @@ class AdeudoEquipo(BaseModel):
 class PosicionEquipo(BaseModel):
     equipo_id: int
     equipo_nombre: str
+    equipo_logo: Optional[str] = None
     pj: int = 0   # Partidos jugados
     pg: int = 0   # Partidos ganados
     pp: int = 0   # Partidos perdidos
