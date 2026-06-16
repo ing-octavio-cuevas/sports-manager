@@ -47,7 +47,7 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
             Partido.equipo_visitante_id.in_(equipos_ids),
         ),
         Partido.torneo_id.in_(torneos_publicados),
-    ).all()
+    ).order_by(Partido.fecha_hora.desc()).all()
 
     hoy = datetime.now(tz).date()
     resultado = []
