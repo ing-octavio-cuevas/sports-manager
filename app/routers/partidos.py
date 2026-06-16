@@ -252,13 +252,21 @@ def get_tabla_posiciones(torneo_id: int, db: Session = Depends(get_db), usuario=
         stats[visitante_id]["sg"] += sets_visitante
         stats[visitante_id]["sp"] += sets_local
 
-        # Ganador/perdedor (por sets ganados)
-        if sets_local > sets_visitante:
-            stats[local_id]["pg"] += 1
-            stats[visitante_id]["pp"] += 1
-        elif sets_visitante > sets_local:
-            stats[visitante_id]["pg"] += 1
-            stats[local_id]["pp"] += 1
+        # Ganador/perdedor: por sets si hay, sino por puntos del partido
+        if sets:
+            if sets_local > sets_visitante:
+                stats[local_id]["pg"] += 1
+                stats[visitante_id]["pp"] += 1
+            elif sets_visitante > sets_local:
+                stats[visitante_id]["pg"] += 1
+                stats[local_id]["pp"] += 1
+        else:
+            if (partido.puntos_local or 0) > (partido.puntos_visitante or 0):
+                stats[local_id]["pg"] += 1
+                stats[visitante_id]["pp"] += 1
+            elif (partido.puntos_visitante or 0) > (partido.puntos_local or 0):
+                stats[visitante_id]["pg"] += 1
+                stats[local_id]["pp"] += 1
 
     # Ordenar por puntos desc, luego por sets ganados desc
     tabla = sorted(stats.values(), key=lambda x: (-x["pts"], -x["sg"]))
