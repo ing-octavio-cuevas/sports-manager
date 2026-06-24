@@ -154,6 +154,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
     """
     from app.schemas import JugadorInfoCompleta, TorneoInfoJugador
     from sqlalchemy import or_
+    from sqlalchemy.orm import joinedload
 
     jugadores = db.query(Jugador).filter(Jugador.usuario_id == usuario.id).all()
     if not jugadores:
@@ -164,7 +165,9 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
         equipo = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
         torneo = db.query(Torneo).filter(Torneo.id == equipo.torneo_id).first()
 
-        partidos = db.query(Partido).filter(
+        partidos = db.query(Partido).options(
+            joinedload(Partido.arbitrajes)
+        ).filter(
             or_(
                 Partido.equipo_local_id == equipo.id,
                 Partido.equipo_visitante_id == equipo.id,

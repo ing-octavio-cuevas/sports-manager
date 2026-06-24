@@ -432,6 +432,18 @@ class TokenResponse(BaseModel):
 
 # ─── Información completa del jugador (vista portal) ─────────
 
+class PartidoArbitrajeInfo(BaseModel):
+    id: int
+    partido_id: int
+    equipo_id: int
+    pagado: bool
+    monto: Optional[float]
+    fecha_pago: Optional[datetime]
+    observaciones: Optional[str]
+
+    model_config = {"from_attributes": True}
+
+
 class PartidoInfoJugador(BaseModel):
     id: int
     jornada_id: int
@@ -443,6 +455,7 @@ class PartidoInfoJugador(BaseModel):
     fecha_hora: Optional[datetime]
     estatus: Optional[str]
     tipo: Optional[str]
+    arbitrajes: list[PartidoArbitrajeInfo] = []
 
     model_config = {"from_attributes": True}
 
