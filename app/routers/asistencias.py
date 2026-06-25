@@ -168,8 +168,7 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
         resultado.append(AsistenciaResponse(
             id=db_asistencia.id,
             partido_id=db_asistencia.partido_id,
-            jugador_id=db_asistencia.jugador_id,
-            registrado_por=db_asistencia.registrado_por,
+            jugador_id=db_asistencia.jugador_id,            equipo_id=jugador.equipo_id,            registrado_por=db_asistencia.registrado_por,
             metodo=db_asistencia.metodo,
             hora_registro=db_asistencia.hora_registro,
             jugador_nombre=jugador.nombre,
@@ -253,6 +252,7 @@ def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Dep
             id=a.id,
             partido_id=a.partido_id,
             jugador_id=a.jugador_id,
+            equipo_id=jugador.equipo_id if jugador else None,
             registrado_por=a.registrado_por,
             metodo=a.metodo,
             hora_registro=hora_local,
@@ -369,8 +369,7 @@ def registrar_asistencia_arbitro(partido_id: int, jugador_id: int, db: Session =
     return AsistenciaResponse(
         id=db_asistencia.id,
         partido_id=db_asistencia.partido_id,
-        jugador_id=db_asistencia.jugador_id,
-        registrado_por=db_asistencia.registrado_por,
+        jugador_id=db_asistencia.jugador_id,            equipo_id=jugador.equipo_id,            registrado_por=db_asistencia.registrado_por,
         metodo=db_asistencia.metodo,
         hora_registro=db_asistencia.hora_registro,
         jugador_nombre=jugador.nombre,
@@ -433,8 +432,7 @@ def registrar_asistencia_manual(data: AsistenciaManualCreate, db: Session = Depe
         resultado.append(AsistenciaResponse(
             id=db_asistencia.id,
             partido_id=db_asistencia.partido_id,
-            jugador_id=db_asistencia.jugador_id,
-            registrado_por=db_asistencia.registrado_por,
+            jugador_id=db_asistencia.jugador_id,            equipo_id=jugador.equipo_id,            registrado_por=db_asistencia.registrado_por,
             metodo=db_asistencia.metodo,
             hora_registro=db_asistencia.hora_registro,
             jugador_nombre=jugador.nombre,

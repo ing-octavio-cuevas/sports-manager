@@ -346,6 +346,7 @@ class AsistenciaResponse(BaseModel):
     id: int
     partido_id: int
     jugador_id: int
+    equipo_id: Optional[int] = None
     registrado_por: int
     metodo: str
     hora_registro: Optional[datetime]
