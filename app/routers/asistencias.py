@@ -237,7 +237,7 @@ def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends
 
 
 @router.get("/partido/{partido_id}", response_model=list[AsistenciaResponse])
-def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+def list_asistencias(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar asistencias de un partido."""
     from datetime import timezone, timedelta
     from app.config import TIMEZONE_OFFSET
