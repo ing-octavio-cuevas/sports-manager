@@ -226,7 +226,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
 
 
 @router.get("/mi-informacion/partidos")
-def get_mis_partidos_paginados(torneo_id: int, page: int = 1, limit: int = 6, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+def get_mis_partidos_paginados(torneo_id: int, page: int = 1, limit: int = 6, buscar: str = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """Partidos paginados del jugador logueado en un torneo específico."""
     from app.schemas import PartidosPaginados
     from sqlalchemy import or_
@@ -251,7 +251,24 @@ def get_mis_partidos_paginados(torneo_id: int, page: int = 1, limit: int = 6, db
             Partido.equipo_local_id == equipo_id,
             Partido.equipo_visitante_id == equipo_id,
         )
-    ).order_by(Partido.fecha_hora.desc())
+    )
+
+    # Filtro de búsqueda por nombre del equipo contrario
+    if buscar:
+        # Obtener IDs de equipos que coinciden con la búsqueda
+        equipos_match = db.query(Equipo.id).filter(Equipo.nombre.ilike(f"%{buscar}%")).all()
+        equipos_match_ids = [e.id for e in equipos_match]
+        if equipos_match_ids:
+            query = query.filter(
+                or_(
+                    Partido.equipo_local_id.in_(equipos_match_ids),
+                    Partido.equipo_visitante_id.in_(equipos_match_ids),
+                )
+            )
+        else:
+            return PartidosPaginados(partidos=[], total=0, page=page, pages=0)
+
+    query = query.order_by(Partido.fecha_hora.desc())
 
     total = query.count()
     pages = math.ceil(total / limit) if limit > 0 else 0
