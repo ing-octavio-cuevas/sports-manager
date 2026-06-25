@@ -551,3 +551,11 @@ class TorneoResumenCompleto(BaseModel):
     torneo: TorneoResumenInfo
     tabla_posiciones: list[PosicionEquipo] = []
     equipos: list[EquipoResumenCompleto] = []
+
+
+# ─── Asistencia manual por anfitrión ────────────────────────
+
+class AsistenciaManualCreate(BaseModel):
+    partido_id: int
+    equipo_id: int
+    jugador_ids: list[int]

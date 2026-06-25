@@ -4,7 +4,7 @@ from sqlalchemy import or_
 
 from app.database import get_db
 from app.models import Asistencia, Partido, Jugador, Equipo
-from app.schemas import AsistenciaCreate, AsistenciaResponse, PartidoCapitanResponse, AsistenciaResumenEquipo, AsistenciaResumenJugador
+from app.schemas import AsistenciaCreate, AsistenciaResponse, PartidoCapitanResponse, AsistenciaResumenEquipo, AsistenciaResumenJugador, AsistenciaManualCreate
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
 
@@ -377,3 +377,70 @@ def registrar_asistencia_arbitro(partido_id: int, jugador_id: int, db: Session =
         jugador_numero=jugador.numero,
         jugador_foto=jugador.foto,
     )
+
+
+# ─── Registro manual por anfitrión ──────────────────────────
+
+@router.post("/manual", response_model=list[AsistenciaResponse], status_code=201)
+def registrar_asistencia_manual(data: AsistenciaManualCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """
+    Registro manual de asistencia por el anfitrión.
+    Sin validación de capitán ni fecha.
+    Valida que los jugadores pertenezcan al equipo indicado y al partido.
+    """
+    from app.models import Torneo as TorneoCheck
+
+    partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
+    if not partido:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    # Validar que el anfitrión sea dueño del torneo
+    torneo = db.query(TorneoCheck).filter(TorneoCheck.id == partido.torneo_id).first()
+    if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+        raise HTTPException(status_code=403, detail="No tienes acceso a este partido")
+
+    # Validar que el equipo pertenece al partido
+    if data.equipo_id not in [partido.equipo_local_id, partido.equipo_visitante_id]:
+        raise HTTPException(status_code=400, detail="El equipo no pertenece a este partido")
+
+    resultado = []
+    for jugador_id in data.jugador_ids:
+        jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
+        if not jugador:
+            raise HTTPException(status_code=404, detail=f"Jugador {jugador_id} no encontrado")
+        if jugador.equipo_id != data.equipo_id:
+            raise HTTPException(status_code=400, detail=f"Jugador {jugador.nombre} no pertenece al equipo indicado")
+
+        # Verificar duplicado
+        existe = db.query(Asistencia).filter(
+            Asistencia.partido_id == data.partido_id,
+            Asistencia.jugador_id == jugador_id,
+        ).first()
+        if existe:
+            continue  # Si ya existe, se salta sin error
+
+        from datetime import datetime
+        db_asistencia = Asistencia(
+            partido_id=data.partido_id,
+            jugador_id=jugador_id,
+            registrado_por=jugador_id,
+            metodo="manual",
+            hora_registro=datetime(1970, 1, 1, 0, 0, 0),
+        )
+        db.add(db_asistencia)
+        db.flush()
+
+        resultado.append(AsistenciaResponse(
+            id=db_asistencia.id,
+            partido_id=db_asistencia.partido_id,
+            jugador_id=db_asistencia.jugador_id,
+            registrado_por=db_asistencia.registrado_por,
+            metodo=db_asistencia.metodo,
+            hora_registro=db_asistencia.hora_registro,
+            jugador_nombre=jugador.nombre,
+            jugador_numero=jugador.numero,
+            jugador_foto=jugador.foto,
+        ))
+
+    db.commit()
+    return resultado
