@@ -207,7 +207,7 @@ def get_mis_partidos_paginados(torneo_id: int, page: int = 1, limit: int = 6, db
         return PartidosPaginados(partidos=[], total=0, page=page, pages=0)
 
     # Query paginada
-    query = db.query(Partido).options(joinedload(Partido.arbitrajes)).filter(
+    query = db.query(Partido).options(joinedload(Partido.arbitrajes), joinedload(Partido.jornada)).filter(
         or_(
             Partido.equipo_local_id == equipo_id,
             Partido.equipo_visitante_id == equipo_id,

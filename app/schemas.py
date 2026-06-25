@@ -447,6 +447,7 @@ class PartidoArbitrajeInfo(BaseModel):
 class PartidoInfoJugador(BaseModel):
     id: int
     jornada_id: int
+    jornada_numero: Optional[int] = None
     equipo_local_id: int
     equipo_visitante_id: int
     puntos_local: int

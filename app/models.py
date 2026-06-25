@@ -142,6 +142,10 @@ class Partido(Base):
     jornada = relationship("Jornada", back_populates="partidos")
     equipo_local = relationship("Equipo", foreign_keys=[equipo_local_id])
     equipo_visitante = relationship("Equipo", foreign_keys=[equipo_visitante_id])
+
+    @property
+    def jornada_numero(self):
+        return self.jornada.numero if self.jornada else None
     ubicacion = relationship("TorneoUbicacion")
     arbitrajes = relationship("PartidoArbitraje", back_populates="partido", cascade="all, delete-orphan")
     sets = relationship("PartidoSet", back_populates="partido", cascade="all, delete-orphan")
