@@ -165,15 +165,6 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
         equipo = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
         torneo = db.query(Torneo).filter(Torneo.id == equipo.torneo_id).first()
 
-        partidos = db.query(Partido).options(
-            joinedload(Partido.arbitrajes)
-        ).filter(
-            or_(
-                Partido.equipo_local_id == equipo.id,
-                Partido.equipo_visitante_id == equipo.id,
-            )
-        ).all()
-
         torneos.append(TorneoInfoJugador(
             torneo_id=torneo.id,
             torneo_nombre=torneo.nombre,
@@ -184,7 +175,6 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
             equipo_nombre=equipo.nombre,
             jugador_id=jugador.id,
             es_capitan=jugador.es_capitan,
-            partidos=partidos,
         ))
 
     return JugadorInfoCompleta(
@@ -193,6 +183,47 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
         celular=usuario.celular,
         email=usuario.email,
         torneos=torneos,
+    )
+
+
+@router.get("/mi-informacion/partidos")
+def get_mis_partidos_paginados(torneo_id: int, page: int = 1, limit: int = 6, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+    """Partidos paginados del jugador logueado en un torneo específico."""
+    from app.schemas import PartidosPaginados
+    from sqlalchemy import or_
+    from sqlalchemy.orm import joinedload
+    import math
+
+    # Buscar jugador del usuario en ese torneo
+    jugadores = db.query(Jugador).filter(Jugador.usuario_id == usuario.id).all()
+    equipo_id = None
+    for j in jugadores:
+        equipo = db.query(Equipo).filter(Equipo.id == j.equipo_id).first()
+        if equipo and equipo.torneo_id == torneo_id:
+            equipo_id = equipo.id
+            break
+
+    if not equipo_id:
+        return PartidosPaginados(partidos=[], total=0, page=page, pages=0)
+
+    # Query paginada
+    query = db.query(Partido).options(joinedload(Partido.arbitrajes)).filter(
+        or_(
+            Partido.equipo_local_id == equipo_id,
+            Partido.equipo_visitante_id == equipo_id,
+        )
+    ).order_by(Partido.fecha_hora.desc())
+
+    total = query.count()
+    pages = math.ceil(total / limit) if limit > 0 else 0
+    offset = (page - 1) * limit
+    partidos = query.offset(offset).limit(limit).all()
+
+    return PartidosPaginados(
+        partidos=partidos,
+        total=total,
+        page=page,
+        pages=pages,
     )
 
 

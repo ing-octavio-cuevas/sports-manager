@@ -470,7 +470,6 @@ class TorneoInfoJugador(BaseModel):
     equipo_nombre: str
     jugador_id: int
     es_capitan: bool
-    partidos: list[PartidoInfoJugador] = []
 
 
 class JugadorInfoCompleta(BaseModel):
@@ -561,3 +560,12 @@ class AsistenciaManualCreate(BaseModel):
     partido_id: int
     equipo_id: int
     jugador_ids: list[int]
+
+
+# ─── Partidos paginados del jugador ──────────────────────────
+
+class PartidosPaginados(BaseModel):
+    partidos: list[PartidoInfoJugador] = []
+    total: int
+    page: int
+    pages: int
