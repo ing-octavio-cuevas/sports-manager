@@ -343,11 +343,15 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             for a in asistencias_partido:
                 jug = next((j for j in jugadores if j.id == a.jugador_id), None)
                 if jug:
+                    from datetime import datetime as dt_check
+                    es_manual = a.hora_registro == dt_check(1970, 1, 1, 0, 0, 0) if a.hora_registro else False
                     jugadores_presentes.append(JugadorAsistenciaInfo(
                         jugador_id=jug.id,
                         nombre=jug.nombre,
                         numero=jug.numero,
                         foto=jug.foto,
+                        hora_registro=a.hora_registro,
+                        manual=es_manual,
                     ))
 
             # Fecha del partido (ya está en hora local)

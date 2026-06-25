@@ -528,6 +528,8 @@ class JugadorAsistenciaInfo(BaseModel):
     nombre: str
     numero: Optional[int]
     foto: Optional[str]
+    hora_registro: Optional[datetime] = None
+    manual: bool = False
 
 
 class AsistenciaResumenPartido(BaseModel):
