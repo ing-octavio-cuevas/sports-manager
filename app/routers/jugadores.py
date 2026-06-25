@@ -114,10 +114,11 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
 
 
 @router.get("", response_model=list[JugadorResponse])
-def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
-    """Listar jugadores. Filtrar por equipo_id opcionalmente."""
+def list_jugadores(equipo_id: int = None, torneo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
+    """Listar jugadores. Filtrar por equipo_id opcionalmente. Si viene torneo_id, incluye % asistencia."""
     from sqlalchemy.orm import joinedload
     from sqlalchemy import or_
+    from app.models import Asistencia
 
     query = db.query(Jugador).options(joinedload(Jugador.usuario))
 
@@ -130,7 +131,45 @@ def list_jugadores(equipo_id: int = None, db: Session = Depends(get_db), usuario
             equipos_ids = [e.id for e in db.query(Equipo).filter(Equipo.torneo_id.in_(torneos_ids)).all()]
             query = query.filter(Jugador.equipo_id.in_(equipos_ids))
 
-    return query.all()
+    jugadores = query.all()
+
+    # Si viene torneo_id, calcular porcentaje de asistencia
+    if torneo_id and equipo_id:
+        partidos_oficiales = db.query(Partido).filter(
+            Partido.torneo_id == torneo_id,
+            Partido.estatus == "Jugado",
+            Partido.tipo == "Oficial",
+            or_(
+                Partido.equipo_local_id == equipo_id,
+                Partido.equipo_visitante_id == equipo_id,
+            ),
+        ).all()
+        total_partidos = len(partidos_oficiales)
+        partido_ids = [p.id for p in partidos_oficiales]
+
+        resultado = []
+        for j in jugadores:
+            asistidos = db.query(Asistencia).filter(
+                Asistencia.jugador_id == j.id,
+                Asistencia.partido_id.in_(partido_ids),
+            ).count() if partido_ids else 0
+            porcentaje = round((asistidos / total_partidos) * 100, 1) if total_partidos > 0 else 0.0
+
+            # Construir response con campos extra
+            j_dict = {
+                "id": j.id, "equipo_id": j.equipo_id, "nombre": j.nombre,
+                "numero": j.numero, "posicion": j.posicion, "estatus": j.estatus,
+                "es_capitan": j.es_capitan, "fecha_creacion": j.fecha_creacion,
+                "foto": j.foto, "curp": j.curp, "codigo_qr": j.codigo_qr,
+                "usuario_id": j.usuario_id, "celular": j.celular, "email": j.email,
+                "partidos_asistidos": asistidos,
+                "total_partidos": total_partidos,
+                "porcentaje_asistencia": porcentaje,
+            }
+            resultado.append(j_dict)
+        return resultado
+
+    return jugadores
 
 
 @router.get("/mi-capitan", response_model=JugadorResponse)

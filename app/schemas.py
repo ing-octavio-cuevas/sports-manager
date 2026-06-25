@@ -165,6 +165,9 @@ class JugadorResponse(BaseModel):
     usuario_id: Optional[int] = None
     celular: Optional[str] = None
     email: Optional[str] = None
+    partidos_asistidos: Optional[int] = None
+    total_partidos: Optional[int] = None
+    porcentaje_asistencia: Optional[float] = None
 
     model_config = {"from_attributes": True}
 
