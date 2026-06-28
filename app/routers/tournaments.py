@@ -360,6 +360,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                 jornada_numero=jornada_p.numero if jornada_p else None,
                 fecha=p.fecha_hora,
                 rival=rival.nombre if rival else "Desconocido",
+                tipo=p.tipo,
                 jugadores_presentes=jugadores_presentes,
                 total_jugadores=total_jugadores,
             ))

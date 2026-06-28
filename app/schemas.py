@@ -541,6 +541,7 @@ class AsistenciaResumenPartido(BaseModel):
     jornada_numero: Optional[int] = None
     fecha: Optional[datetime]
     rival: str
+    tipo: Optional[str] = None
     jugadores_presentes: list[JugadorAsistenciaInfo] = []
     total_jugadores: int
 
