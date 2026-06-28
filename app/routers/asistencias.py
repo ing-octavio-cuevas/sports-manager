@@ -436,3 +436,35 @@ def registrar_asistencia_manual(data: AsistenciaManualCreate, db: Session = Depe
 
     db.commit()
     return resultado
+
+
+# ─── Eliminar asistencias manual por anfitrión ───────────────
+
+class AsistenciaManualDelete(BaseModel):
+    partido_id: int
+    jugador_ids: list[int]
+
+
+from pydantic import BaseModel as PydanticBase
+
+
+@router.delete("/manual", status_code=204)
+def eliminar_asistencia_manual(data: AsistenciaManualDelete, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """Eliminar asistencias de jugadores específicos en un partido. Solo anfitrión."""
+    from app.models import Torneo as TorneoCheck
+
+    partido = db.query(Partido).filter(Partido.id == data.partido_id).first()
+    if not partido:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    # Validar que el anfitrión sea dueño del torneo
+    torneo = db.query(TorneoCheck).filter(TorneoCheck.id == partido.torneo_id).first()
+    if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+        raise HTTPException(status_code=403, detail="No tienes acceso a este partido")
+
+    # Eliminar asistencias
+    db.query(Asistencia).filter(
+        Asistencia.partido_id == data.partido_id,
+        Asistencia.jugador_id.in_(data.jugador_ids),
+    ).delete(synchronize_session=False)
+    db.commit()
