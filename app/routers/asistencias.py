@@ -100,7 +100,7 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
 @router.post("", response_model=list[AsistenciaResponse], status_code=201)
 def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """
-    Registrar asistencia en lote del equipo contrario.
+    Registrar asistencia en lote de tu propio equipo.
     Determina automáticamente qué jugador capitán del usuario corresponde al partido.
     """
     # Verificar partido
@@ -141,20 +141,14 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     if ya_registro:
         raise HTTPException(status_code=400, detail="Ya se registró asistencia para este partido. No se puede modificar")
 
-    # Determinar el equipo contrario al capitán
-    if capitan.equipo_id == partido.equipo_local_id:
-        equipo_contrario_id = partido.equipo_visitante_id
-    else:
-        equipo_contrario_id = partido.equipo_local_id
-
-    # Validar y registrar cada jugador
+    # Validar y registrar cada jugador (del equipo propio del capitán)
     resultado = []
     for jugador_id in data.jugador_ids:
         jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
         if not jugador:
             raise HTTPException(status_code=404, detail=f"Jugador con id {jugador_id} no encontrado")
-        if jugador.equipo_id != equipo_contrario_id:
-            raise HTTPException(status_code=400, detail=f"Jugador {jugador.nombre} no pertenece al equipo contrario")
+        if jugador.equipo_id != capitan.equipo_id:
+            raise HTTPException(status_code=400, detail=f"Jugador {jugador.nombre} no pertenece a tu equipo")
 
         db_asistencia = Asistencia(
             partido_id=data.partido_id,
@@ -270,25 +264,25 @@ from app.schemas import EstadoAsistenciaPartido
 def get_estado_asistencia(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
     """
     Estado de asistencia de un partido.
-    Indica si cada equipo ya completó su registro de asistencia.
-    El capitán del equipo local registra asistencia del visitante y viceversa.
+    Indica si cada capitán ya registró la asistencia de su propio equipo.
     """
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
 
-    # Buscar si el capitán del equipo local ya registró (registra jugadores del visitante)
+    # Capitán del equipo local
     capitan_local = db.query(Jugador).filter(
         Jugador.equipo_id == partido.equipo_local_id,
         Jugador.es_capitan == True,
     ).first()
 
+    # Capitán del equipo visitante
     capitan_visitante = db.query(Jugador).filter(
         Jugador.equipo_id == partido.equipo_visitante_id,
         Jugador.es_capitan == True,
     ).first()
 
-    # El capitán local registra asistencia del visitante
+    # El capitán local registra asistencia de su equipo (local)
     asistencia_local = None
     if capitan_local:
         asistencia_local = db.query(Asistencia).filter(
@@ -296,7 +290,7 @@ def get_estado_asistencia(partido_id: int, db: Session = Depends(get_db), usuari
             Asistencia.registrado_por == capitan_local.id,
         ).first()
 
-    # El capitán visitante registra asistencia del local
+    # El capitán visitante registra asistencia de su equipo (visitante)
     asistencia_visitante = None
     if capitan_visitante:
         asistencia_visitante = db.query(Asistencia).filter(
