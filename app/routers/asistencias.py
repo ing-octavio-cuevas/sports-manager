@@ -440,12 +440,12 @@ def registrar_asistencia_manual(data: AsistenciaManualCreate, db: Session = Depe
 
 # ─── Eliminar asistencias manual por anfitrión ───────────────
 
-class AsistenciaManualDelete(BaseModel):
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class AsistenciaManualDelete(PydanticBaseModel):
     partido_id: int
     jugador_ids: list[int]
-
-
-from pydantic import BaseModel as PydanticBase
 
 
 @router.delete("/manual", status_code=204)
