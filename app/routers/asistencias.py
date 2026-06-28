@@ -11,18 +11,22 @@ from app.config import ROL_ANFITRION, ROL_JUGADOR
 router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
 
-@router.get("/mis-partidos", response_model=list[PartidoCapitanResponse])
-@router.get("/capitan/{capitan_id}/partidos", response_model=list[PartidoCapitanResponse])
-def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR)), capitan_id: int = None):
+@router.get("/mis-partidos")
+@router.get("/capitan/{capitan_id}/partidos")
+def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR)), capitan_id: int = None):
     """
-    Obtener todos los partidos donde el usuario logueado es capitán.
-    Busca todos sus jugadores capitanes y devuelve partidos de todos sus equipos.
+    Obtener partidos donde el usuario logueado es capitán.
+    filtro: 'hoy' | 'caducados' | None (todos)
+    Paginado.
     """
     from datetime import datetime, timezone, timedelta
     from app.config import TIMEZONE_OFFSET
     from app.models import Jornada, TorneoUbicacion
+    from app.schemas import PartidosCapitanPaginados
+    import math
 
     tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
+    hoy = datetime.now(tz).date()
 
     # Buscar todos los jugadores capitanes de este usuario
     capitanes = db.query(Jugador).filter(
@@ -30,47 +34,52 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
         Jugador.es_capitan == True,
     ).all()
     if not capitanes:
-        return []
+        return PartidosCapitanPaginados(partidos=[], total=0, page=page, pages=0)
 
-    # Obtener equipos de todos sus capitanes
     equipos_ids = [c.equipo_id for c in capitanes]
     capitan_por_equipo = {c.equipo_id: c.id for c in capitanes}
 
     from app.models import Torneo as TorneoModel
-
-    # Obtener torneos publicados
     torneos_publicados = [t.id for t in db.query(TorneoModel).filter(TorneoModel.publicado == True).all()]
 
-    partidos = db.query(Partido).filter(
+    # Query base
+    query = db.query(Partido).filter(
         or_(
             Partido.equipo_local_id.in_(equipos_ids),
             Partido.equipo_visitante_id.in_(equipos_ids),
         ),
         Partido.torneo_id.in_(torneos_publicados),
-    ).order_by(Partido.fecha_hora.desc()).all()
+    )
 
-    hoy = datetime.now(tz).date()
+    # Obtener todos para filtrar por fecha (ya que fecha es comparación en Python)
+    todos_partidos = query.order_by(Partido.fecha_hora.desc()).all()
+
+    # Filtrar por tab
+    if filtro == "hoy":
+        todos_partidos = [p for p in todos_partidos if p.fecha_hora and p.fecha_hora.date() == hoy]
+    elif filtro == "caducados":
+        todos_partidos = [p for p in todos_partidos if p.fecha_hora and p.fecha_hora.date() < hoy]
+
+    # Paginación
+    total = len(todos_partidos)
+    pages = math.ceil(total / limit) if limit > 0 else 0
+    offset = (page - 1) * limit
+    partidos_pagina = todos_partidos[offset:offset + limit]
+
+    # Construir response
     resultado = []
-    for p in partidos:
+    for p in partidos_pagina:
         es_hoy = p.fecha_hora.date() == hoy if p.fecha_hora else False
         caducado = p.fecha_hora.date() < hoy if p.fecha_hora else False
 
-        # Jornada info
         jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
-
-        # Torneo info
         torneo_p = db.query(TorneoModel).filter(TorneoModel.id == p.torneo_id).first()
-
-        # Ubicación info
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
-        # Determinar cuál capitán corresponde a este partido
-        capitan_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
-
-        # Verificar si ya registró asistencia
+        cap_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
         ya_registro = db.query(Asistencia).filter(
             Asistencia.partido_id == p.id,
-            Asistencia.registrado_por == capitan_id,
+            Asistencia.registrado_por == cap_id,
         ).first()
 
         resultado.append(PartidoCapitanResponse(
@@ -94,7 +103,12 @@ def get_partidos_capitan(db: Session = Depends(get_db), usuario=Depends(require_
             asistencia_registrada=ya_registro is not None,
         ))
 
-    return resultado
+    return PartidosCapitanPaginados(
+        partidos=resultado,
+        total=total,
+        page=page,
+        pages=pages,
+    )
 
 
 @router.post("", response_model=list[AsistenciaResponse], status_code=201)

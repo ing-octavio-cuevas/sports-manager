@@ -575,3 +575,12 @@ class PartidosPaginados(BaseModel):
     total: int
     page: int
     pages: int
+
+
+# ─── Partidos capitán paginados ──────────────────────────────
+
+class PartidosCapitanPaginados(BaseModel):
+    partidos: list[PartidoCapitanResponse] = []
+    total: int
+    page: int
+    pages: int
