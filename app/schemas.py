@@ -598,6 +598,7 @@ class EstadisticasEquipo(BaseModel):
     porcentaje_victorias: float = 0.0
     promedio_puntos_partido: float = 0.0
     ultimos_resultados: list[str] = []
+    puntos_acumulados: list[int] = []
     racha_actual: int = 0
     distribucion_posiciones: dict = {}
 

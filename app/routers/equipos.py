@@ -111,6 +111,17 @@ def get_estadisticas_equipo(equipo_id: int, torneo_id: int, db: Session = Depend
 
     ultimos_10 = resultados[:10]
 
+    # Puntos acumulados (orden cronológico)
+    partidos_cronologicos = list(reversed(partidos))
+    puntos_acumulados = []
+    acumulado = 0
+    for p in partidos_cronologicos:
+        if p.equipo_local_id == equipo_id:
+            acumulado += p.puntos_local or 0
+        else:
+            acumulado += p.puntos_visitante or 0
+        puntos_acumulados.append(acumulado)
+
     # Racha actual
     racha = 0
     if ultimos_10:
@@ -142,6 +153,7 @@ def get_estadisticas_equipo(equipo_id: int, torneo_id: int, db: Session = Depend
         porcentaje_victorias=porcentaje_victorias,
         promedio_puntos_partido=promedio_puntos,
         ultimos_resultados=ultimos_10,
+        puntos_acumulados=puntos_acumulados,
         racha_actual=racha,
         distribucion_posiciones=distribucion,
     )

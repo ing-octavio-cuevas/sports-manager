@@ -436,6 +436,17 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             if pos.strip():
                 distribucion[pos] = distribucion.get(pos, 0) + 1
 
+        # Puntos acumulados (orden cronológico)
+        partidos_cronologicos = sorted(partidos_ordenados, key=lambda x: x.fecha_hora or '')
+        puntos_acumulados = []
+        acumulado = 0
+        for p in partidos_cronologicos:
+            if p.equipo_local_id == equipo.id:
+                acumulado += p.puntos_local or 0
+            else:
+                acumulado += p.puntos_visitante or 0
+            puntos_acumulados.append(acumulado)
+
         estadisticas = EstadisticasEquipo(
             total_jugadores=len(jugadores),
             partidos_jugados=pj,
@@ -445,6 +456,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             porcentaje_victorias=porcentaje_victorias,
             promedio_puntos_partido=promedio_puntos,
             ultimos_resultados=ultimos_10,
+            puntos_acumulados=puntos_acumulados,
             racha_actual=racha,
             distribucion_posiciones=distribucion,
         )
