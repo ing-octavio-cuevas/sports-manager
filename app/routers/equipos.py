@@ -54,6 +54,99 @@ def get_equipo(equipo_id: int, db: Session = Depends(get_db), usuario=Depends(re
     return equipo
 
 
+@router.get("/{equipo_id}/estadisticas")
+def get_estadisticas_equipo(equipo_id: int, torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+    """Estadísticas del equipo en un torneo específico."""
+    from app.models import Jugador, Partido, PartidoSet
+    from app.schemas import EstadisticasEquipo
+    from sqlalchemy import or_
+
+    equipo = db.query(Equipo).filter(Equipo.id == equipo_id).first()
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    jugadores = db.query(Jugador).filter(Jugador.equipo_id == equipo_id).all()
+
+    # Partidos oficiales jugados del equipo en este torneo
+    partidos = db.query(Partido).filter(
+        Partido.torneo_id == torneo_id,
+        Partido.estatus == "Jugado",
+        Partido.tipo == "Oficial",
+        or_(
+            Partido.equipo_local_id == equipo_id,
+            Partido.equipo_visitante_id == equipo_id,
+        ),
+    ).order_by(Partido.fecha_hora.desc()).all()
+
+    pj = len(partidos)
+    pg = 0
+    pp = 0
+    puntos_totales = 0
+    resultados = []
+
+    for p in partidos:
+        if p.equipo_local_id == equipo_id:
+            pts_equipo = p.puntos_local or 0
+            pts_rival = p.puntos_visitante or 0
+        else:
+            pts_equipo = p.puntos_visitante or 0
+            pts_rival = p.puntos_local or 0
+
+        puntos_totales += pts_equipo
+
+        sets = db.query(PartidoSet).filter(PartidoSet.partido_id == p.id).all()
+        if sets:
+            sl = sum(1 for s in sets if s.marcador_local > s.marcador_visitante)
+            sv = sum(1 for s in sets if s.marcador_visitante > s.marcador_local)
+            gano = (sl > sv) if p.equipo_local_id == equipo_id else (sv > sl)
+        else:
+            gano = pts_equipo > pts_rival
+
+        if gano:
+            pg += 1
+            resultados.append("G")
+        else:
+            pp += 1
+            resultados.append("P")
+
+    ultimos_10 = resultados[:10]
+
+    # Racha actual
+    racha = 0
+    if ultimos_10:
+        primer_resultado = ultimos_10[0]
+        for r in ultimos_10:
+            if r == primer_resultado:
+                racha += 1
+            else:
+                break
+        if primer_resultado == "P":
+            racha = -racha
+
+    porcentaje_victorias = round((pg / pj) * 100, 1) if pj > 0 else 0.0
+    promedio_puntos = round(puntos_totales / pj, 2) if pj > 0 else 0.0
+
+    # Distribución de posiciones
+    distribucion = {}
+    for j in jugadores:
+        pos = j.posicion or "Sin posición"
+        if pos.strip():
+            distribucion[pos] = distribucion.get(pos, 0) + 1
+
+    return EstadisticasEquipo(
+        total_jugadores=len(jugadores),
+        partidos_jugados=pj,
+        partidos_ganados=pg,
+        partidos_perdidos=pp,
+        puntos_totales=puntos_totales,
+        porcentaje_victorias=porcentaje_victorias,
+        promedio_puntos_partido=promedio_puntos,
+        ultimos_resultados=ultimos_10,
+        racha_actual=racha,
+        distribucion_posiciones=distribucion,
+    )
+
+
 @router.put("/{equipo_id}", response_model=EquipoResponse)
 def update_equipo(equipo_id: int, equipo_data: EquipoUpdate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Actualizar un equipo."""
