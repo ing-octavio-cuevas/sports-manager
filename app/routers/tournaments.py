@@ -365,12 +365,97 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                 total_jugadores=total_jugadores,
             ))
 
+        # ─── Estadísticas del equipo ─────────────────────────
+        from app.schemas import EstadisticasEquipo
+
+        # Partidos oficiales jugados de este equipo
+        partidos_equipo_jugados = [p for p in partidos_jugados
+            if p.equipo_local_id == equipo.id or p.equipo_visitante_id == equipo.id]
+
+        pj = len(partidos_equipo_jugados)
+        pg = 0
+        pp = 0
+        puntos_totales = 0
+        resultados = []
+
+        # Ordenar por fecha desc para ultimos_resultados
+        partidos_ordenados = sorted(partidos_equipo_jugados, key=lambda x: x.fecha_hora or '', reverse=True)
+
+        for partido in partidos_ordenados:
+            if partido.equipo_local_id == equipo.id:
+                pts_equipo = partido.puntos_local or 0
+                pts_rival = partido.puntos_visitante or 0
+            else:
+                pts_equipo = partido.puntos_visitante or 0
+                pts_rival = partido.puntos_local or 0
+
+            puntos_totales += pts_equipo
+
+            # Determinar ganador
+            sets_p = db.query(PartidoSet).filter(PartidoSet.partido_id == partido.id).all()
+            if sets_p:
+                sl = sum(1 for s in sets_p if s.marcador_local > s.marcador_visitante)
+                sv = sum(1 for s in sets_p if s.marcador_visitante > s.marcador_local)
+                if partido.equipo_local_id == equipo.id:
+                    gano = sl > sv
+                else:
+                    gano = sv > sl
+            else:
+                gano = pts_equipo > pts_rival
+
+            if gano:
+                pg += 1
+                resultados.append("G")
+            elif pts_equipo < pts_rival or (sets_p and not gano and pts_equipo != pts_rival):
+                pp += 1
+                resultados.append("P")
+            else:
+                resultados.append("E")
+
+        ultimos_10 = resultados[:10]
+
+        # Racha actual
+        racha = 0
+        if ultimos_10:
+            primer_resultado = ultimos_10[0]
+            for r in ultimos_10:
+                if r == primer_resultado:
+                    racha += 1
+                else:
+                    break
+            if primer_resultado == "P":
+                racha = -racha
+
+        porcentaje_victorias = round((pg / pj) * 100, 1) if pj > 0 else 0.0
+        promedio_puntos = round(puntos_totales / pj, 2) if pj > 0 else 0.0
+
+        # Distribución de posiciones
+        distribucion = {}
+        for j in jugadores:
+            pos = j.posicion or "Sin posición"
+            if pos.strip():
+                distribucion[pos] = distribucion.get(pos, 0) + 1
+
+        estadisticas = EstadisticasEquipo(
+            total_jugadores=len(jugadores),
+            partidos_jugados=pj,
+            partidos_ganados=pg,
+            partidos_perdidos=pp,
+            puntos_totales=puntos_totales,
+            porcentaje_victorias=porcentaje_victorias,
+            promedio_puntos_partido=promedio_puntos,
+            ultimos_resultados=ultimos_10,
+            racha_actual=racha,
+            distribucion_posiciones=distribucion,
+        )
+
         equipos_resumen.append(EquipoResumenCompleto(
             id=equipo.id,
             nombre=equipo.nombre,
             logo=equipo.logo,
             jugadores=jugadores,
             ultimas_asistencias=ultimas_asistencias,
+            estadisticas=estadisticas,
         ))
 
     return TorneoResumenCompleto(

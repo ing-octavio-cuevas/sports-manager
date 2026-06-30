@@ -552,6 +552,7 @@ class EquipoResumenCompleto(BaseModel):
     logo: Optional[str]
     jugadores: list[JugadorResponse] = []
     ultimas_asistencias: list[AsistenciaResumenPartido] = []
+    estadisticas: Optional[EstadisticasEquipo] = None
 
 
 class TorneoResumenCompleto(BaseModel):
@@ -584,3 +585,18 @@ class PartidosCapitanPaginados(BaseModel):
     total: int
     page: int
     pages: int
+
+
+# ─── Estadísticas de equipo para resumen ─────────────────────
+
+class EstadisticasEquipo(BaseModel):
+    total_jugadores: int = 0
+    partidos_jugados: int = 0
+    partidos_ganados: int = 0
+    partidos_perdidos: int = 0
+    puntos_totales: int = 0
+    porcentaje_victorias: float = 0.0
+    promedio_puntos_partido: float = 0.0
+    ultimos_resultados: list[str] = []
+    racha_actual: int = 0
+    distribucion_posiciones: dict = {}
