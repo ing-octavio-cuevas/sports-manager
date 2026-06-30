@@ -552,7 +552,7 @@ class EquipoResumenCompleto(BaseModel):
     logo: Optional[str]
     jugadores: list[JugadorResponse] = []
     ultimas_asistencias: list[AsistenciaResumenPartido] = []
-    estadisticas: Optional[EstadisticasEquipo] = None
+    estadisticas: Optional["EstadisticasEquipo"] = None
 
 
 class TorneoResumenCompleto(BaseModel):
@@ -600,3 +600,6 @@ class EstadisticasEquipo(BaseModel):
     ultimos_resultados: list[str] = []
     racha_actual: int = 0
     distribucion_posiciones: dict = {}
+
+
+EquipoResumenCompleto.model_rebuild()
