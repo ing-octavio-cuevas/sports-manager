@@ -256,3 +256,28 @@ def upload_logo_equipo(equipo_id: int, logo: UploadFile = File(...), db: Session
     db.commit()
     db.refresh(equipo)
     return equipo
+
+
+# ─── Configuración de privacidad por capitán ─────────────────
+
+@router.put("/{equipo_id}/privacidad")
+def update_privacidad_equipo(equipo_id: int, mostrar_publico: bool, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR))):
+    """El capitán puede activar/desactivar la visibilidad pública de su equipo."""
+    from app.models import Jugador
+
+    equipo = db.query(Equipo).filter(Equipo.id == equipo_id).first()
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    # Verificar que sea capitán de este equipo
+    capitan = db.query(Jugador).filter(
+        Jugador.usuario_id == usuario.id,
+        Jugador.equipo_id == equipo_id,
+        Jugador.es_capitan == True,
+    ).first()
+    if not capitan:
+        raise HTTPException(status_code=403, detail="Solo el capitán puede cambiar esta configuración")
+
+    equipo.mostrar_publico = mostrar_publico
+    db.commit()
+    return {"detail": f"Visibilidad pública {'activada' if mostrar_publico else 'desactivada'}"}

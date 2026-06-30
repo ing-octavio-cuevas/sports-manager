@@ -465,9 +465,9 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             id=equipo.id,
             nombre=equipo.nombre,
             logo=equipo.logo,
-            jugadores=jugadores,
+            jugadores=jugadores if equipo.mostrar_publico else [],
             ultimas_asistencias=ultimas_asistencias,
-            estadisticas=estadisticas,
+            estadisticas=estadisticas if equipo.mostrar_publico else None,
         ))
 
     return TorneoResumenCompleto(

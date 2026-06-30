@@ -98,6 +98,7 @@ class EquipoCreate(BaseModel):
     inscripcion_pagada: Optional[bool] = False
     monto_pagado: Optional[float] = None
     fecha_pago_inscripcion: Optional[datetime] = None
+    mostrar_publico: Optional[bool] = True
 
 
 class EquipoUpdate(BaseModel):
@@ -107,6 +108,7 @@ class EquipoUpdate(BaseModel):
     inscripcion_pagada: Optional[bool] = None
     monto_pagado: Optional[float] = None
     fecha_pago_inscripcion: Optional[datetime] = None
+    mostrar_publico: Optional[bool] = None
 
 
 class EquipoResponse(BaseModel):
@@ -119,6 +121,7 @@ class EquipoResponse(BaseModel):
     inscripcion_pagada: bool
     monto_pagado: Optional[float]
     fecha_pago_inscripcion: Optional[datetime]
+    mostrar_publico: bool
 
     model_config = {"from_attributes": True}
 
