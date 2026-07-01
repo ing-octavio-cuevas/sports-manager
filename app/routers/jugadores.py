@@ -399,11 +399,14 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
                     db.delete(usuario_jugador)
             jugador.usuario_id = None
 
-    # Si viene email y el jugador ya tiene usuario, actualizar el email
-    if email and jugador.usuario_id:
+    # Si viene email o celular y el jugador ya tiene usuario, actualizar
+    if jugador.usuario_id:
         usuario_jugador = db.query(Usuario).filter(Usuario.id == jugador.usuario_id).first()
         if usuario_jugador:
-            usuario_jugador.email = email
+            if email:
+                usuario_jugador.email = email
+            if celular:
+                usuario_jugador.celular = celular
 
     for field, value in update_data.items():
         setattr(jugador, field, value)
