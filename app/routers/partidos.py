@@ -115,7 +115,7 @@ def list_partidos(
         query = query.filter(Partido.torneo_id == torneo_id)
     if jornada_id:
         query = query.filter(Partido.jornada_id == jornada_id)
-    return query.all()
+    return query.order_by(Partido.fecha_hora, Partido.ubicacion_id).all()
 
 
 @router.get("/{partido_id}", response_model=PartidoResponse)
