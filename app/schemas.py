@@ -396,6 +396,7 @@ class PartidoCapitanResponse(BaseModel):
     es_hoy: bool = False
     caducado: bool = False
     registro_abierto: bool = False
+    registro_expirado: bool = False
     asistencia_registrada: bool = False
 
     model_config = {"from_attributes": True}

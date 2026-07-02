@@ -38,6 +38,17 @@ def _calcular_registro_abierto(partido, torneo, hoy, ahora):
     return True
 
 
+def _calcular_registro_expirado(partido, torneo, ahora):
+    """True cuando ya pasó fecha_hora + horas_limite_asistencia."""
+    from datetime import timedelta
+    if not partido.fecha_hora:
+        return False
+    if not torneo or not torneo.horas_limite_asistencia:
+        return False
+    limite = partido.fecha_hora + timedelta(hours=torneo.horas_limite_asistencia)
+    return ahora.replace(tzinfo=None) > limite
+
+
 @router.get("/mis-partidos")
 @router.get("/capitan/{capitan_id}/partidos")
 def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR)), capitan_id: int = None):
@@ -129,6 +140,7 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             es_hoy=es_hoy,
             caducado=caducado,
             registro_abierto=_calcular_registro_abierto(p, torneo_p, hoy, datetime.now(tz)),
+            registro_expirado=_calcular_registro_expirado(p, torneo_p, datetime.now(tz)),
             asistencia_registrada=ya_registro is not None,
         ))
 
