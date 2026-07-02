@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Partido, PartidoArbitraje, Torneo
-from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse
+from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse, PartidoBulkCreate, PartidoBulkResponse
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
 
@@ -32,6 +32,68 @@ def create_partido(partido: PartidoCreate, db: Session = Depends(get_db), usuari
     db.commit()
     db.refresh(db_partido)
     return db_partido
+
+
+@router.post("/bulk", status_code=201)
+def create_partidos_bulk(data: PartidoBulkCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """Crear múltiples partidos en una jornada."""
+    from app.schemas import PartidoBulkResponse
+    from app.models import Jornada, Equipo as EquipoModel
+    from sqlalchemy.orm import joinedload
+
+    # Verificar jornada
+    jornada = db.query(Jornada).filter(Jornada.id == data.jornada_id).first()
+    if not jornada:
+        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+
+    # Verificar acceso al torneo
+    torneo = db.query(Torneo).filter(Torneo.id == jornada.torneo_id).first()
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
+
+    partidos_creados = []
+    for item in data.partidos:
+        if item.equipo_local_id == item.equipo_visitante_id:
+            raise HTTPException(status_code=400, detail="Un equipo no puede jugar contra sí mismo")
+
+        # Validar que los equipos pertenezcan al torneo
+        equipo_local = db.query(EquipoModel).filter(EquipoModel.id == item.equipo_local_id).first()
+        if not equipo_local or equipo_local.torneo_id != jornada.torneo_id:
+            raise HTTPException(status_code=400, detail=f"El equipo con id {item.equipo_local_id} no pertenece al torneo")
+
+        equipo_visitante = db.query(EquipoModel).filter(EquipoModel.id == item.equipo_visitante_id).first()
+        if not equipo_visitante or equipo_visitante.torneo_id != jornada.torneo_id:
+            raise HTTPException(status_code=400, detail=f"El equipo con id {item.equipo_visitante_id} no pertenece al torneo")
+
+        db_partido = Partido(
+            torneo_id=jornada.torneo_id,
+            jornada_id=data.jornada_id,
+            equipo_local_id=item.equipo_local_id,
+            equipo_visitante_id=item.equipo_visitante_id,
+            fecha_hora=item.fecha_hora,
+            ubicacion_id=item.ubicacion_id,
+            tipo=item.tipo,
+            observaciones=item.observaciones,
+        )
+        db.add(db_partido)
+        db.flush()
+
+        # Crear arbitrajes
+        for equipo_id in [item.equipo_local_id, item.equipo_visitante_id]:
+            arbitraje = PartidoArbitraje(partido_id=db_partido.id, equipo_id=equipo_id)
+            db.add(arbitraje)
+
+        partidos_creados.append(db_partido)
+
+    db.commit()
+    for p in partidos_creados:
+        db.refresh(p)
+
+    return PartidoBulkResponse(
+        creados=len(partidos_creados),
+        partidos=partidos_creados,
+    )
 
 
 @router.get("", response_model=list[PartidoResponse])

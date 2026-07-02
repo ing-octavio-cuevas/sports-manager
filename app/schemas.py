@@ -628,3 +628,24 @@ class EstadisticasEquipo(BaseModel):
 
 
 EquipoResumenCompleto.model_rebuild()
+
+
+# ─── Creación masiva de partidos ─────────────────────────────
+
+class PartidoBulkItem(BaseModel):
+    equipo_local_id: int
+    equipo_visitante_id: int
+    fecha_hora: Optional[datetime] = None
+    ubicacion_id: Optional[int] = None
+    tipo: Optional[str] = None
+    observaciones: Optional[str] = None
+
+
+class PartidoBulkCreate(BaseModel):
+    jornada_id: int
+    partidos: list[PartidoBulkItem]
+
+
+class PartidoBulkResponse(BaseModel):
+    creados: int
+    partidos: list[PartidoResponse] = []
