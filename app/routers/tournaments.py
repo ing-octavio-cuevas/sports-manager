@@ -499,6 +499,8 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                     equipo_visitante_nombre=visitante.nombre if visitante else "Desconocido",
                     fecha_hora=pr.fecha_hora,
                     ubicacion_nombre=ubic.nombre if ubic else None,
+                    ubicacion_direccion=ubic.direccion if ubic else None,
+                    ubicacion_url=ubic.ubicacion if ubic else None,
                 ))
             rol = RolJornada(
                 jornada_numero=jornada_r.numero,

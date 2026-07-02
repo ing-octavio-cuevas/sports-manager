@@ -659,6 +659,8 @@ class PartidoRolItem(BaseModel):
     equipo_visitante_nombre: str
     fecha_hora: Optional[datetime]
     ubicacion_nombre: Optional[str] = None
+    ubicacion_direccion: Optional[str] = None
+    ubicacion_url: Optional[str] = None
 
 
 class RolJornada(BaseModel):
