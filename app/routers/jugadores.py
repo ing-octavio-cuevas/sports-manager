@@ -210,6 +210,8 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
             torneo_logo=torneo.logo,
             torneo_reglamento=torneo.reglamento,
             torneo_publicado=torneo.publicado,
+            torneo_periodo=torneo.periodo,
+            torneo_categoria=torneo.categoria,
             equipo_id=equipo.id,
             equipo_nombre=equipo.nombre,
             jugador_id=jugador.id,

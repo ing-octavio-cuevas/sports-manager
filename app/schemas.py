@@ -476,6 +476,8 @@ class TorneoInfoJugador(BaseModel):
     torneo_logo: Optional[str] = None
     torneo_reglamento: Optional[str] = None
     torneo_publicado: bool = True
+    torneo_periodo: Optional[str] = None
+    torneo_categoria: Optional[str] = None
     equipo_id: int
     equipo_nombre: str
     jugador_id: int
