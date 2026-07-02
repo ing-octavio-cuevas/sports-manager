@@ -583,6 +583,7 @@ class TorneoResumenCompleto(BaseModel):
     torneo: TorneoResumenInfo
     tabla_posiciones: list[PosicionEquipo] = []
     equipos: list[EquipoResumenCompleto] = []
+    rol: Optional["RolJornada"] = None
 
 
 # ─── Asistencia manual por anfitrión ────────────────────────
@@ -649,3 +650,18 @@ class PartidoBulkCreate(BaseModel):
 class PartidoBulkResponse(BaseModel):
     creados: int
     partidos: list[PartidoResponse] = []
+
+
+# ─── Rol (jornada activa) para resumen público ───────────────
+
+class PartidoRolItem(BaseModel):
+    equipo_local_nombre: str
+    equipo_visitante_nombre: str
+    fecha_hora: Optional[datetime]
+    ubicacion_nombre: Optional[str] = None
+
+
+class RolJornada(BaseModel):
+    jornada_numero: Optional[int] = None
+    jornada_fecha: Optional[datetime] = None
+    partidos: list[PartidoRolItem] = []

@@ -471,10 +471,41 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             estadisticas=estadisticas if equipo.mostrar_publico else None,
         ))
 
+    # ─── Rol: jornada activa (próxima con partidos pendientes) ──
+    from app.schemas import RolJornada, PartidoRolItem
+
+    # Buscar jornada más próxima con partidos pendientes
+    jornadas_torneo = db.query(Jornada).filter(Jornada.torneo_id == torneo_id).order_by(Jornada.numero).all()
+    rol = None
+    for jornada_r in jornadas_torneo:
+        partidos_pendientes = db.query(Partido).filter(
+            Partido.jornada_id == jornada_r.id,
+            Partido.estatus != "Jugado",
+        ).order_by(Partido.ubicacion_id, Partido.fecha_hora).all()
+        if partidos_pendientes:
+            partidos_rol = []
+            for pr in partidos_pendientes:
+                local = next((e for e in equipos if e.id == pr.equipo_local_id), None)
+                visitante = next((e for e in equipos if e.id == pr.equipo_visitante_id), None)
+                ubic = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == pr.ubicacion_id).first() if pr.ubicacion_id else None
+                partidos_rol.append(PartidoRolItem(
+                    equipo_local_nombre=local.nombre if local else "Desconocido",
+                    equipo_visitante_nombre=visitante.nombre if visitante else "Desconocido",
+                    fecha_hora=pr.fecha_hora,
+                    ubicacion_nombre=ubic.nombre if ubic else None,
+                ))
+            rol = RolJornada(
+                jornada_numero=jornada_r.numero,
+                jornada_fecha=jornada_r.fecha,
+                partidos=partidos_rol,
+            )
+            break
+
     return TorneoResumenCompleto(
         torneo=torneo_info,
         tabla_posiciones=tabla_posiciones,
         equipos=equipos_resumen,
+        rol=rol,
     )
 
 
