@@ -11,6 +11,27 @@ from app.config import ROL_ANFITRION, ROL_JUGADOR
 router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
 
+def _calcular_registro_abierto(partido, torneo, hoy, ahora):
+    """Determina si la ventana de registro está abierta."""
+    from datetime import timedelta
+    if not partido.fecha_hora:
+        return False
+    fecha_partido = partido.fecha_hora
+    # No ha llegado la hora del partido
+    if ahora.replace(tzinfo=None) < fecha_partido:
+        return False
+    # Verificar límite de horas
+    if torneo and torneo.horas_limite_asistencia:
+        limite = fecha_partido + timedelta(hours=torneo.horas_limite_asistencia)
+        if ahora.replace(tzinfo=None) > limite:
+            return False
+    else:
+        # Sin horas_limite, solo permitir el día del partido
+        if fecha_partido.date() != hoy:
+            return False
+    return True
+
+
 @router.get("/mis-partidos")
 @router.get("/capitan/{capitan_id}/partidos")
 def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_JUGADOR)), capitan_id: int = None):
@@ -98,8 +119,10 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             ubicacion_direccion=ubicacion.direccion if ubicacion else None,
             ubicacion_url=ubicacion.ubicacion if ubicacion else None,
             fecha_hora=p.fecha_hora,
+            horas_limite_asistencia=torneo_p.horas_limite_asistencia if torneo_p else None,
             es_hoy=es_hoy,
             caducado=caducado,
+            registro_abierto=_calcular_registro_abierto(p, torneo_p, hoy, datetime.now(tz)),
             asistencia_registrada=ya_registro is not None,
         ))
 

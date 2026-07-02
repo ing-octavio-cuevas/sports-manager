@@ -5,7 +5,7 @@ Schemas Pydantic para validación de entrada/salida.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ─── Anfitrion ───────────────────────────────────────────────
@@ -73,6 +73,13 @@ class TorneoUpdate(BaseModel):
     numero_vueltas: Optional[int] = None
     fecha_inicio_asistencias: Optional[datetime] = None
     horas_limite_asistencia: Optional[int] = None
+
+    @field_validator("fecha_inicio_asistencias", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v == "null":
+            return None
+        return v
 
 
 class TorneoResponse(BaseModel):
@@ -385,8 +392,10 @@ class PartidoCapitanResponse(BaseModel):
     ubicacion_direccion: Optional[str] = None
     ubicacion_url: Optional[str] = None
     fecha_hora: Optional[datetime]
+    horas_limite_asistencia: Optional[int] = None
     es_hoy: bool = False
     caducado: bool = False
+    registro_abierto: bool = False
     asistencia_registrada: bool = False
 
     model_config = {"from_attributes": True}
