@@ -557,6 +557,7 @@ class EquipoResumenCompleto(BaseModel):
     id: int
     nombre: str
     logo: Optional[str]
+    mostrar_publico: bool = True
     jugadores: list[JugadorResponse] = []
     ultimas_asistencias: list[AsistenciaResumenPartido] = []
     estadisticas: Optional["EstadisticasEquipo"] = None
