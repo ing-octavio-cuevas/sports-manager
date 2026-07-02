@@ -396,10 +396,7 @@ class PartidoCapitanResponse(BaseModel):
     ubicacion_url: Optional[str] = None
     fecha_hora: Optional[datetime]
     horas_limite_asistencia: Optional[int] = None
-    es_hoy: bool = False
-    caducado: bool = False
-    registro_abierto: bool = False
-    registro_expirado: bool = False
+    estado_registro: str = "pendiente"
     asistencia_registrada: bool = False
 
     model_config = {"from_attributes": True}

@@ -13,29 +13,25 @@ router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
 def _calcular_registro_abierto(partido, torneo, hoy, ahora):
     """
-    Determina si la ventana de registro está abierta.
-    registro_abierto = true SI:
-      - Ya llegó la hora del partido (NOW >= fecha_hora)
-      - Y no se han pasado las horas límite (si hay límite configurado)
+    Determina el estado_registro: 'pendiente', 'abierto' o 'expirado'.
     """
     from datetime import timedelta
     if not partido.fecha_hora:
-        return False
+        return "pendiente"
     fecha_partido = partido.fecha_hora
     ahora_naive = ahora.replace(tzinfo=None)
 
     # Aún no llega la hora del partido
     if ahora_naive < fecha_partido:
-        return False
+        return "pendiente"
 
-    # Si hay horas_limite, verificar que no se haya expirado
+    # Si hay horas_limite, verificar si expiró
     if torneo and torneo.horas_limite_asistencia:
         limite = fecha_partido + timedelta(hours=torneo.horas_limite_asistencia)
         if ahora_naive > limite:
-            return False
+            return "expirado"
 
-    # Sin horas_limite, siempre abierto después de la hora del partido
-    return True
+    return "abierto"
 
 
 def _calcular_registro_expirado(partido, torneo, ahora):
@@ -89,29 +85,33 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
         Partido.torneo_id.in_(torneos_publicados),
     )
 
-    # Obtener todos para filtrar por fecha (ya que fecha es comparación en Python)
+    # Obtener todos para filtrar
     todos_partidos = query.order_by(Partido.fecha_hora.desc()).all()
 
+    # Calcular estado_registro para cada partido y filtrar
+    ahora = datetime.now(tz)
+    partidos_con_estado = []
+    for p in todos_partidos:
+        torneo_p = db.query(TorneoModel).filter(TorneoModel.id == p.torneo_id).first()
+        estado = _calcular_registro_abierto(p, torneo_p, hoy, ahora)
+        partidos_con_estado.append((p, estado, torneo_p))
+
     # Filtrar por tab
-    if filtro == "hoy":
-        todos_partidos = [p for p in todos_partidos if p.fecha_hora and p.fecha_hora.date() == hoy]
-    elif filtro == "caducados":
-        todos_partidos = [p for p in todos_partidos if p.fecha_hora and p.fecha_hora.date() < hoy]
+    if filtro == "disponibles":
+        partidos_con_estado = [(p, e, t) for p, e, t in partidos_con_estado if e in ("pendiente", "abierto")]
+    elif filtro == "pasadas":
+        partidos_con_estado = [(p, e, t) for p, e, t in partidos_con_estado if e == "expirado"]
 
     # Paginación
-    total = len(todos_partidos)
+    total = len(partidos_con_estado)
     pages = math.ceil(total / limit) if limit > 0 else 0
     offset = (page - 1) * limit
-    partidos_pagina = todos_partidos[offset:offset + limit]
+    partidos_pagina = partidos_con_estado[offset:offset + limit]
 
     # Construir response
     resultado = []
-    for p in partidos_pagina:
-        es_hoy = p.fecha_hora.date() == hoy if p.fecha_hora else False
-        caducado = p.fecha_hora.date() < hoy if p.fecha_hora else False
-
+    for p, estado, torneo_p in partidos_pagina:
         jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
-        torneo_p = db.query(TorneoModel).filter(TorneoModel.id == p.torneo_id).first()
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
         cap_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
@@ -141,10 +141,7 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             ubicacion_url=ubicacion.ubicacion if ubicacion else None,
             fecha_hora=p.fecha_hora,
             horas_limite_asistencia=torneo_p.horas_limite_asistencia if torneo_p else None,
-            es_hoy=es_hoy,
-            caducado=caducado,
-            registro_abierto=_calcular_registro_abierto(p, torneo_p, hoy, datetime.now(tz)),
-            registro_expirado=_calcular_registro_expirado(p, torneo_p, datetime.now(tz)),
+            estado_registro=estado,
             asistencia_registrada=ya_registro is not None,
         ))
 
