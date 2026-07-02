@@ -124,6 +124,8 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             id=p.id,
             torneo_id=p.torneo_id,
             torneo_nombre=torneo_p.nombre if torneo_p else None,
+            torneo_periodo=torneo_p.periodo if torneo_p else None,
+            torneo_categoria=torneo_p.categoria if torneo_p else None,
             jornada_id=p.jornada_id,
             jornada_numero=jornada.numero if jornada else None,
             jornada_fecha=jornada.fecha if jornada else None,

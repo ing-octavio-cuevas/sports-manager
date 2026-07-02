@@ -380,6 +380,8 @@ class PartidoCapitanResponse(BaseModel):
     id: int
     torneo_id: int
     torneo_nombre: Optional[str] = None
+    torneo_periodo: Optional[str] = None
+    torneo_categoria: Optional[str] = None
     jornada_id: int
     jornada_numero: Optional[int] = None
     jornada_fecha: Optional[datetime] = None
