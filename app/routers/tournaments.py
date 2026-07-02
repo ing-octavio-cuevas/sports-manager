@@ -473,6 +473,11 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
 
     # ─── Rol: jornada activa (próxima con partidos pendientes) ──
     from app.schemas import RolJornada, PartidoRolItem
+    from datetime import datetime as dt_rol, timezone as tz_rol, timedelta as td_rol
+    from app.config import TIMEZONE_OFFSET as TZ_OFF_ROL
+
+    tz_local = tz_rol(td_rol(hours=TZ_OFF_ROL))
+    hoy_rol = dt_rol.now(tz_local).date()
 
     # Buscar jornada más próxima con partidos pendientes
     jornadas_torneo = db.query(Jornada).filter(Jornada.torneo_id == torneo_id).order_by(Jornada.numero).all()
@@ -481,6 +486,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
         partidos_pendientes = db.query(Partido).filter(
             Partido.jornada_id == jornada_r.id,
             Partido.estatus != "Jugado",
+            Partido.fecha_hora >= dt_rol.combine(hoy_rol, dt_rol.min.time()),
         ).order_by(Partido.ubicacion_id, Partido.fecha_hora).all()
         if partidos_pendientes:
             partidos_rol = []
