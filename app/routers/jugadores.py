@@ -135,7 +135,10 @@ def list_jugadores(equipo_id: int = None, torneo_id: int = None, db: Session = D
 
     # Si viene torneo_id, calcular porcentaje de asistencia
     if torneo_id and equipo_id:
-        partidos_oficiales = db.query(Partido).filter(
+        # Obtener fecha_inicio_asistencias del torneo
+        torneo_obj = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+
+        query_partidos = db.query(Partido).filter(
             Partido.torneo_id == torneo_id,
             Partido.estatus == "Jugado",
             Partido.tipo == "Oficial",
@@ -143,7 +146,11 @@ def list_jugadores(equipo_id: int = None, torneo_id: int = None, db: Session = D
                 Partido.equipo_local_id == equipo_id,
                 Partido.equipo_visitante_id == equipo_id,
             ),
-        ).all()
+        )
+        if torneo_obj and torneo_obj.fecha_inicio_asistencias:
+            query_partidos = query_partidos.filter(Partido.fecha_hora >= torneo_obj.fecha_inicio_asistencias)
+
+        partidos_oficiales = query_partidos.all()
         total_partidos = len(partidos_oficiales)
         partido_ids = [p.id for p in partidos_oficiales]
 

@@ -32,6 +32,7 @@ class Torneo(Base):
     categoria = Column(String(500), nullable=True)
     anfitrion_id = Column(Integer, ForeignKey("anfitrion.id"), nullable=False)
     numero_vueltas = Column(Integer, default=2)
+    fecha_inicio_asistencias = Column(DateTime, nullable=True)
 
     # Relaciones
     anfitrion = relationship("Anfitrion", back_populates="torneos")

@@ -198,8 +198,12 @@ def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
 
+    # Obtener fecha_inicio_asistencias del torneo
+    from app.models import Torneo as TorneoModel
+    torneo = db.query(TorneoModel).filter(TorneoModel.id == torneo_id).first()
+
     # Total de partidos del equipo en el torneo con estatus "Jugado" y tipo "Oficial"
-    partidos = db.query(Partido).filter(
+    query_partidos = db.query(Partido).filter(
         Partido.torneo_id == torneo_id,
         Partido.estatus == "Jugado",
         Partido.tipo == "Oficial",
@@ -207,7 +211,12 @@ def get_resumen_asistencia(equipo_id: int, torneo_id: int, db: Session = Depends
             Partido.equipo_local_id == equipo_id,
             Partido.equipo_visitante_id == equipo_id,
         ),
-    ).all()
+    )
+    # Filtrar por fecha_inicio_asistencias si está configurada
+    if torneo and torneo.fecha_inicio_asistencias:
+        query_partidos = query_partidos.filter(Partido.fecha_hora >= torneo.fecha_inicio_asistencias)
+
+    partidos = query_partidos.all()
     total_partidos = len(partidos)
     partido_ids = [p.id for p in partidos]
 
