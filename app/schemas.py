@@ -59,6 +59,7 @@ class TorneoCreate(BaseModel):
     anfitrion_id: int
     numero_vueltas: Optional[int] = 2
     fecha_inicio_asistencias: Optional[datetime] = None
+    horas_limite_asistencia: Optional[int] = None
 
 
 class TorneoUpdate(BaseModel):
@@ -71,6 +72,7 @@ class TorneoUpdate(BaseModel):
     anfitrion_id: Optional[int] = None
     numero_vueltas: Optional[int] = None
     fecha_inicio_asistencias: Optional[datetime] = None
+    horas_limite_asistencia: Optional[int] = None
 
 
 class TorneoResponse(BaseModel):
@@ -85,6 +87,7 @@ class TorneoResponse(BaseModel):
     anfitrion_id: int
     numero_vueltas: Optional[int]
     fecha_inicio_asistencias: Optional[datetime]
+    horas_limite_asistencia: Optional[int]
     anfitrion: AnfitrionResponse
     ubicaciones: list[TorneoUbicacionResponse] = []
 

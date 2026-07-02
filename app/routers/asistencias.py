@@ -128,14 +128,35 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
     if not torneo_partido or not torneo_partido.publicado:
         raise HTTPException(status_code=400, detail="No se puede registrar asistencia en un torneo no publicado")
 
-    # Validar que sea el día del partido
+    # Validar tiempo para registrar asistencia
     from datetime import datetime as dt_module, timezone, timedelta
     from app.config import TIMEZONE_OFFSET
+    from app.models import Torneo as TorneoValidacion
+
     if partido.fecha_hora:
         tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
-        hoy = dt_module.now(tz).date()
-        if partido.fecha_hora.date() != hoy:
-            raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia el día del partido")
+        ahora = dt_module.now(tz)
+        fecha_partido = partido.fecha_hora
+
+        # Validar que sea el día del partido
+        if fecha_partido.date() != ahora.date():
+            # Si tiene horas_limite, verificar si aún está dentro del rango
+            torneo_val = db.query(TorneoValidacion).filter(TorneoValidacion.id == partido.torneo_id).first()
+            if torneo_val and torneo_val.horas_limite_asistencia:
+                limite = fecha_partido + timedelta(hours=torneo_val.horas_limite_asistencia)
+                if ahora.replace(tzinfo=None) <= limite:
+                    pass  # Dentro del rango permitido
+                else:
+                    raise HTTPException(status_code=400, detail="El tiempo para registrar asistencia ha expirado")
+            else:
+                raise HTTPException(status_code=400, detail="Solo se puede registrar asistencia el día del partido")
+        else:
+            # Es el día del partido, verificar horas_limite si ya pasó la hora
+            torneo_val = db.query(TorneoValidacion).filter(TorneoValidacion.id == partido.torneo_id).first()
+            if torneo_val and torneo_val.horas_limite_asistencia:
+                limite = fecha_partido + timedelta(hours=torneo_val.horas_limite_asistencia)
+                if ahora.replace(tzinfo=None) > limite:
+                    raise HTTPException(status_code=400, detail="El tiempo para registrar asistencia ha expirado")
 
     # Buscar el capitán del usuario que pertenece a este partido
     capitanes = db.query(Jugador).filter(
