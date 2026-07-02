@@ -94,13 +94,21 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
     for p in todos_partidos:
         torneo_p = db.query(TorneoModel).filter(TorneoModel.id == p.torneo_id).first()
         estado = _calcular_registro_abierto(p, torneo_p, hoy, ahora)
-        partidos_con_estado.append((p, estado, torneo_p))
+
+        # Verificar si ya registró asistencia
+        cap_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
+        ya_registro = db.query(Asistencia).filter(
+            Asistencia.partido_id == p.id,
+            Asistencia.registrado_por == cap_id,
+        ).first()
+
+        partidos_con_estado.append((p, estado, torneo_p, ya_registro is not None))
 
     # Filtrar por tab
     if filtro == "disponibles":
-        partidos_con_estado = [(p, e, t) for p, e, t in partidos_con_estado if e in ("pendiente", "abierto")]
+        partidos_con_estado = [(p, e, t, r) for p, e, t, r in partidos_con_estado if e in ("pendiente", "abierto") and not r]
     elif filtro == "pasadas":
-        partidos_con_estado = [(p, e, t) for p, e, t in partidos_con_estado if e == "expirado"]
+        partidos_con_estado = [(p, e, t, r) for p, e, t, r in partidos_con_estado if e == "expirado" or r]
 
     # Paginación
     total = len(partidos_con_estado)
@@ -110,16 +118,11 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
 
     # Construir response
     resultado = []
-    for p, estado, torneo_p in partidos_pagina:
+    for p, estado, torneo_p, ya_registro in partidos_pagina:
         jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
-        cap_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
         mi_equipo = p.equipo_local_id if p.equipo_local_id in equipos_ids else p.equipo_visitante_id
-        ya_registro = db.query(Asistencia).filter(
-            Asistencia.partido_id == p.id,
-            Asistencia.registrado_por == cap_id,
-        ).first()
 
         resultado.append(PartidoCapitanResponse(
             id=p.id,
@@ -142,7 +145,7 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             fecha_hora=p.fecha_hora,
             horas_limite_asistencia=torneo_p.horas_limite_asistencia if torneo_p else None,
             estado_registro=estado,
-            asistencia_registrada=ya_registro is not None,
+            asistencia_registrada=ya_registro,
         ))
 
     return PartidosCapitanPaginados(
