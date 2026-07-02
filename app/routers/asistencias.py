@@ -12,23 +12,29 @@ router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
 
 def _calcular_registro_abierto(partido, torneo, hoy, ahora):
-    """Determina si la ventana de registro está abierta."""
+    """
+    Determina si la ventana de registro está abierta.
+    registro_abierto = true SI:
+      - Ya llegó la hora del partido (NOW >= fecha_hora)
+      - Y no se han pasado las horas límite (si hay límite configurado)
+    """
     from datetime import timedelta
     if not partido.fecha_hora:
         return False
     fecha_partido = partido.fecha_hora
-    # No ha llegado la hora del partido
-    if ahora.replace(tzinfo=None) < fecha_partido:
+    ahora_naive = ahora.replace(tzinfo=None)
+
+    # Aún no llega la hora del partido
+    if ahora_naive < fecha_partido:
         return False
-    # Verificar límite de horas
+
+    # Si hay horas_limite, verificar que no se haya expirado
     if torneo and torneo.horas_limite_asistencia:
         limite = fecha_partido + timedelta(hours=torneo.horas_limite_asistencia)
-        if ahora.replace(tzinfo=None) > limite:
+        if ahora_naive > limite:
             return False
-    else:
-        # Sin horas_limite, solo permitir el día del partido
-        if fecha_partido.date() != hoy:
-            return False
+
+    # Sin horas_limite, siempre abierto después de la hora del partido
     return True
 
 
