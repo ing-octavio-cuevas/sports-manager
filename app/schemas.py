@@ -385,6 +385,7 @@ class PartidoCapitanResponse(BaseModel):
     jornada_id: int
     jornada_numero: Optional[int] = None
     jornada_fecha: Optional[datetime] = None
+    mi_equipo_id: Optional[int] = None
     equipo_local_id: int
     equipo_visitante_id: int
     estatus: Optional[str]

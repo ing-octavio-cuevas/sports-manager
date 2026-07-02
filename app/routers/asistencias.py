@@ -115,6 +115,7 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
         ubicacion = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == p.ubicacion_id).first() if p.ubicacion_id else None
 
         cap_id = capitan_por_equipo.get(p.equipo_local_id) or capitan_por_equipo.get(p.equipo_visitante_id)
+        mi_equipo = p.equipo_local_id if p.equipo_local_id in equipos_ids else p.equipo_visitante_id
         ya_registro = db.query(Asistencia).filter(
             Asistencia.partido_id == p.id,
             Asistencia.registrado_por == cap_id,
@@ -129,6 +130,7 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
             jornada_id=p.jornada_id,
             jornada_numero=jornada.numero if jornada else None,
             jornada_fecha=jornada.fecha if jornada else None,
+            mi_equipo_id=mi_equipo,
             equipo_local_id=p.equipo_local_id,
             equipo_visitante_id=p.equipo_visitante_id,
             estatus=p.estatus,
