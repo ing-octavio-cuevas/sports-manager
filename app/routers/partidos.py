@@ -75,6 +75,7 @@ def create_partidos_bulk(data: PartidoBulkCreate, db: Session = Depends(get_db),
             ubicacion_id=item.ubicacion_id,
             tipo=item.tipo,
             observaciones=item.observaciones,
+            estatus="Por jugar",
         )
         db.add(db_partido)
         db.flush()
