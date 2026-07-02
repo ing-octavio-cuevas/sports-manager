@@ -72,6 +72,14 @@ class Equipo(Base):
     torneo = relationship("Torneo", back_populates="equipos")
     jugadores = relationship("Jugador", back_populates="equipo")
 
+    @property
+    def total_jugadores(self):
+        return len(self.jugadores) if self.jugadores else 0
+
+    @property
+    def tiene_capitan(self):
+        return any(j.es_capitan for j in self.jugadores) if self.jugadores else False
+
 
 class Jugador(Base):
     __tablename__ = "jugador"

@@ -122,6 +122,8 @@ class EquipoResponse(BaseModel):
     monto_pagado: Optional[float]
     fecha_pago_inscripcion: Optional[datetime]
     mostrar_publico: bool
+    total_jugadores: Optional[int] = None
+    tiene_capitan: Optional[bool] = None
 
     model_config = {"from_attributes": True}
 
