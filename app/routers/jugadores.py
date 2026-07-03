@@ -429,12 +429,20 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
 
 @router.delete("/{jugador_id}", status_code=204)
 def delete_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
-    """Soft delete — desactiva el jugador (estatus = False)."""
+    """Elimina el jugador si no tiene asistencias, sino soft delete."""
+    from app.models import Asistencia
+
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if not jugador:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
-    jugador.estatus = False
-    db.commit()
+
+    tiene_asistencias = db.query(Asistencia).filter(Asistencia.jugador_id == jugador_id).first()
+    if tiene_asistencias:
+        jugador.estatus = False
+        db.commit()
+    else:
+        db.delete(jugador)
+        db.commit()
 
 
 # ─── Upload de foto ──────────────────────────────────────────
