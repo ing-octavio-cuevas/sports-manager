@@ -114,7 +114,7 @@ def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db), usuari
 
 
 @router.get("", response_model=list[JugadorResponse])
-def list_jugadores(equipo_id: int = None, torneo_id: int = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
+def list_jugadores(equipo_id: int = None, torneo_id: int = None, estatus: bool = None, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
     """Listar jugadores. Filtrar por equipo_id opcionalmente. Si viene torneo_id, incluye % asistencia."""
     from sqlalchemy.orm import joinedload
     from sqlalchemy import or_
@@ -130,6 +130,9 @@ def list_jugadores(equipo_id: int = None, torneo_id: int = None, db: Session = D
             torneos_ids = [t.id for t in db.query(Torneo).filter(Torneo.anfitrion_id == usuario.anfitrion_id).all()]
             equipos_ids = [e.id for e in db.query(Equipo).filter(Equipo.torneo_id.in_(torneos_ids)).all()]
             query = query.filter(Jugador.equipo_id.in_(equipos_ids))
+
+    if estatus is not None:
+        query = query.filter(Jugador.estatus == estatus)
 
     jugadores = query.all()
 
