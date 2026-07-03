@@ -333,16 +333,18 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             # Jornada
             jornada_p = db.query(Jornada).filter(Jornada.id == p.jornada_id).first()
 
-            # Jugadores presentes (detalle)
+            # Jugadores presentes (detalle) - incluye jugadores dados de baja
+            # Obtener todos los jugadores del equipo (activos e inactivos) para buscar asistencias
+            todos_jugadores_equipo = db.query(Jugador).filter(Jugador.equipo_id == equipo.id).all()
             asistencias_partido = db.query(Asistencia).filter(
                 Asistencia.partido_id == p.id,
-                Asistencia.jugador_id.in_([j.id for j in jugadores]),
+                Asistencia.jugador_id.in_([j.id for j in todos_jugadores_equipo]),
             ).all()
 
             from app.schemas import JugadorAsistenciaInfo
             jugadores_presentes = []
             for a in asistencias_partido:
-                jug = next((j for j in jugadores if j.id == a.jugador_id), None)
+                jug = next((j for j in todos_jugadores_equipo if j.id == a.jugador_id), None)
                 if jug:
                     from datetime import datetime as dt_check
                     es_manual = a.hora_registro == dt_check(1970, 1, 1, 0, 0, 0) if a.hora_registro else False
