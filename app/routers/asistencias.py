@@ -62,10 +62,12 @@ def get_partidos_capitan(filtro: str = None, page: int = 1, limit: int = 6, db: 
     tz = timezone(timedelta(hours=TIMEZONE_OFFSET))
     hoy = datetime.now(tz).date()
 
-    # Buscar todos los jugadores capitanes de este usuario
-    capitanes = db.query(Jugador).filter(
+    # Buscar todos los jugadores capitanes de este usuario (solo equipos activos)
+    from app.models import Equipo as EquipoCheck
+    capitanes = db.query(Jugador).join(EquipoCheck, Jugador.equipo_id == EquipoCheck.id).filter(
         Jugador.usuario_id == usuario.id,
         Jugador.es_capitan == True,
+        EquipoCheck.estatus == True,
     ).all()
     if not capitanes:
         return PartidosCapitanPaginados(partidos=[], total=0, page=page, pages=0)

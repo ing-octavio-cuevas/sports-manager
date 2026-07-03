@@ -205,7 +205,10 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
     from sqlalchemy import or_
     from sqlalchemy.orm import joinedload
 
-    jugadores = db.query(Jugador).filter(Jugador.usuario_id == usuario.id).all()
+    jugadores = db.query(Jugador).join(Equipo, Jugador.equipo_id == Equipo.id).filter(
+        Jugador.usuario_id == usuario.id,
+        Equipo.estatus == True,
+    ).all()
     if not jugadores:
         raise HTTPException(status_code=404, detail="No tienes jugadores vinculados")
 
@@ -439,8 +442,19 @@ def delete_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depen
     tiene_asistencias = db.query(Asistencia).filter(Asistencia.jugador_id == jugador_id).first()
     if tiene_asistencias:
         jugador.estatus = False
+        jugador.fecha_baja = __import__('datetime').datetime.utcnow()
         db.commit()
     else:
+        # Eliminar foto de S3 si existe
+        if jugador.foto and S3_URL_BASE and S3_URL_BASE in jugador.foto:
+            import boto3
+            from app.config import S3_BUCKET, S3_REGION
+            try:
+                s3 = boto3.client("s3", region_name=S3_REGION)
+                old_key = jugador.foto.replace(f"{S3_URL_BASE}/", "")
+                s3.delete_object(Bucket=S3_BUCKET, Key=old_key)
+            except Exception:
+                pass
         db.delete(jugador)
         db.commit()
 

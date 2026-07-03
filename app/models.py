@@ -94,6 +94,7 @@ class Jugador(Base):
     estatus = Column(Boolean, default=True)
     es_capitan = Column(Boolean, default=False)
     fecha_creacion = Column(DateTime, server_default=func.now())
+    fecha_baja = Column(DateTime, nullable=True)
     foto = Column(String(500), nullable=True)
     curp = Column(String(18), nullable=True)
     codigo_qr = Column(String(100), nullable=False, unique=True)

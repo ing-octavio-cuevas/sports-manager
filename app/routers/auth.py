@@ -23,6 +23,16 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not usuario.estatus:
         raise HTTPException(status_code=401, detail="Usuario inactivo")
 
+    # Si solo tiene rol jugador, verificar que tenga al menos un equipo activo
+    if "jugador" in usuario.roles and "anfitrion" not in usuario.roles:
+        from app.models import Jugador, Equipo
+        tiene_equipo_activo = db.query(Jugador).join(Equipo, Jugador.equipo_id == Equipo.id).filter(
+            Jugador.usuario_id == usuario.id,
+            Equipo.estatus == True,
+        ).first()
+        if not tiene_equipo_activo:
+            raise HTTPException(status_code=403, detail="No estás inscrito en ningún torneo activo")
+
     token = create_access_token(data={"sub": str(usuario.id)})
 
     return TokenResponse(

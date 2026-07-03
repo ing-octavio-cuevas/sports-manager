@@ -177,6 +177,7 @@ class JugadorResponse(BaseModel):
     estatus: bool
     es_capitan: bool
     fecha_creacion: Optional[datetime]
+    fecha_baja: Optional[datetime] = None
     foto: Optional[str]
     curp: Optional[str]
     codigo_qr: str
