@@ -158,7 +158,9 @@ def update_partido(partido_id: int, partido_data: PartidoUpdate, db: Session = D
 
 @router.delete("/{partido_id}", status_code=204)
 def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
-    """Eliminar un partido."""
+    """Eliminar un partido. No permite si tiene asistencias registradas."""
+    from app.models import Asistencia
+
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
@@ -167,6 +169,10 @@ def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depen
         torneo = db.query(Torneo).filter(Torneo.id == partido.torneo_id).first()
         if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
             raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
+    # No permitir si tiene asistencias
+    tiene_asistencias = db.query(Asistencia).filter(Asistencia.partido_id == partido_id).first()
+    if tiene_asistencias:
+        raise HTTPException(status_code=400, detail="No se puede eliminar, el partido tiene asistencias registradas")
     db.delete(partido)
     db.commit()
 
