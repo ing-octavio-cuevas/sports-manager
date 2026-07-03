@@ -311,7 +311,8 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
     equipos_resumen = []
     for equipo in equipos:
         jugadores = db.query(Jugador).options(joinedload(Jugador.usuario)).filter(
-            Jugador.equipo_id == equipo.id
+            Jugador.equipo_id == equipo.id,
+            Jugador.estatus == True,
         ).all()
 
         # Últimas 4 asistencias del equipo (oficiales y amistosos)
