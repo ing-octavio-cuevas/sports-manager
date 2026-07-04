@@ -69,6 +69,7 @@ class Equipo(Base):
     monto_pagado = Column(Numeric(10, 2), nullable=True)
     fecha_pago_inscripcion = Column(DateTime, nullable=True)
     mostrar_publico = Column(Boolean, default=True)
+    permite_edicion_jugadores = Column(Boolean, default=True)
 
     # Relación
     torneo = relationship("Torneo", back_populates="equipos")

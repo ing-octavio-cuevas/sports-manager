@@ -112,6 +112,7 @@ class EquipoCreate(BaseModel):
     monto_pagado: Optional[float] = None
     fecha_pago_inscripcion: Optional[datetime] = None
     mostrar_publico: Optional[bool] = True
+    permite_edicion_jugadores: Optional[bool] = True
 
 
 class EquipoUpdate(BaseModel):
@@ -122,6 +123,7 @@ class EquipoUpdate(BaseModel):
     monto_pagado: Optional[float] = None
     fecha_pago_inscripcion: Optional[datetime] = None
     mostrar_publico: Optional[bool] = None
+    permite_edicion_jugadores: Optional[bool] = None
 
 
 class EquipoResponse(BaseModel):
@@ -135,6 +137,7 @@ class EquipoResponse(BaseModel):
     monto_pagado: Optional[float]
     fecha_pago_inscripcion: Optional[datetime]
     mostrar_publico: bool
+    permite_edicion_jugadores: bool
     total_jugadores: Optional[int] = None
     tiene_capitan: Optional[bool] = None
 
@@ -499,6 +502,7 @@ class TorneoInfoJugador(BaseModel):
     equipo_nombre: str
     jugador_id: int
     es_capitan: bool
+    permite_edicion_jugadores: bool = True
 
 
 class JugadorInfoCompleta(BaseModel):

@@ -229,6 +229,7 @@ def get_mi_informacion(db: Session = Depends(get_db), usuario=Depends(require_ro
             equipo_nombre=equipo.nombre,
             jugador_id=jugador.id,
             es_capitan=jugador.es_capitan,
+            permite_edicion_jugadores=equipo.permite_edicion_jugadores,
         ))
 
     return JugadorInfoCompleta(
