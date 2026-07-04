@@ -191,6 +191,17 @@ class JugadorResponse(BaseModel):
     total_partidos: Optional[int] = None
     porcentaje_asistencia: Optional[float] = None
 
+    @field_validator("fecha_baja", mode="after")
+    @classmethod
+    def convert_fecha_baja_to_cdmx(cls, v):
+        if v is None:
+            return None
+        from datetime import timezone, timedelta
+        # Asumir UTC, convertir a CDMX
+        utc_dt = v.replace(tzinfo=timezone.utc)
+        cdmx = utc_dt.astimezone(timezone(timedelta(hours=-6)))
+        return cdmx.replace(tzinfo=None)
+
     model_config = {"from_attributes": True}
 
 

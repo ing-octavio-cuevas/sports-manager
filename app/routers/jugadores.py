@@ -442,8 +442,9 @@ def delete_jugador(jugador_id: int, db: Session = Depends(get_db), usuario=Depen
 
     tiene_asistencias = db.query(Asistencia).filter(Asistencia.jugador_id == jugador_id).first()
     if tiene_asistencias:
+        from datetime import datetime
         jugador.estatus = False
-        jugador.fecha_baja = __import__('datetime').datetime.utcnow()
+        jugador.fecha_baja = datetime.utcnow()
         db.commit()
     else:
         # Eliminar foto de S3 si existe
