@@ -279,30 +279,13 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
         stats[local_id]["pts"] += partido.puntos_local or 0
         stats[visitante_id]["pts"] += partido.puntos_visitante or 0
 
-        # Sets (si existen)
-        sets = db.query(PartidoSet).filter(PartidoSet.partido_id == partido.id).all()
-        sets_local = sum(1 for s in sets if s.marcador_local > s.marcador_visitante)
-        sets_visitante = sum(1 for s in sets if s.marcador_visitante > s.marcador_local)
-        stats[local_id]["sg"] += sets_local
-        stats[local_id]["sp"] += sets_visitante
-        stats[visitante_id]["sg"] += sets_visitante
-        stats[visitante_id]["sp"] += sets_local
-
-        # Ganador/perdedor: por sets si hay, sino por puntos del partido
-        if sets:
-            if sets_local > sets_visitante:
-                stats[local_id]["pg"] += 1
-                stats[visitante_id]["pp"] += 1
-            elif sets_visitante > sets_local:
-                stats[visitante_id]["pg"] += 1
-                stats[local_id]["pp"] += 1
-        else:
-            if (partido.puntos_local or 0) > (partido.puntos_visitante or 0):
-                stats[local_id]["pg"] += 1
-                stats[visitante_id]["pp"] += 1
-            elif (partido.puntos_visitante or 0) > (partido.puntos_local or 0):
-                stats[visitante_id]["pg"] += 1
-                stats[local_id]["pp"] += 1
+        # Ganador/perdedor: solo por puntos del partido
+        if (partido.puntos_local or 0) > (partido.puntos_visitante or 0):
+            stats[local_id]["pg"] += 1
+            stats[visitante_id]["pp"] += 1
+        elif (partido.puntos_visitante or 0) > (partido.puntos_local or 0):
+            stats[visitante_id]["pg"] += 1
+            stats[local_id]["pp"] += 1
 
     tabla = sorted(stats.values(), key=lambda x: (-x["pts"], -x["sg"]))
     tabla_posiciones = [PosicionEquipo(**row) for row in tabla]
