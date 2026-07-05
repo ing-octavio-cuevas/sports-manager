@@ -118,6 +118,25 @@ def list_partidos(
     return query.order_by(Partido.ubicacion_id, Partido.fecha_hora).all()
 
 
+@router.get("/equipo/{equipo_id}", response_model=list[PartidoResponse])
+def list_partidos_equipo(equipo_id: int, torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION, ROL_JUGADOR))):
+    """Listar todos los partidos de un equipo en un torneo."""
+    from sqlalchemy.orm import joinedload
+    from sqlalchemy import or_
+
+    return db.query(Partido).options(
+        joinedload(Partido.arbitrajes),
+        joinedload(Partido.sets),
+        joinedload(Partido.jornada),
+    ).filter(
+        Partido.torneo_id == torneo_id,
+        or_(
+            Partido.equipo_local_id == equipo_id,
+            Partido.equipo_visitante_id == equipo_id,
+        ),
+    ).order_by(Partido.fecha_hora).all()
+
+
 @router.get("/{partido_id}", response_model=PartidoResponse)
 def get_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Obtener un partido por ID."""

@@ -344,11 +344,15 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
         email = None
 
     # Numero solo se puede asignar si actualmente es null o es el mismo valor
+    # A menos que el equipo tenga permite_edicion_jugadores activado
     if "numero" in update_data:
         if update_data["numero"] == 0:
             update_data["numero"] = None
         elif update_data["numero"] is not None:
-            if jugador.numero is not None and update_data["numero"] != jugador.numero:
+            equipo_jugador = db.query(Equipo).filter(Equipo.id == jugador.equipo_id).first()
+            puede_editar = equipo_jugador.permite_edicion_jugadores if equipo_jugador else False
+
+            if not puede_editar and jugador.numero is not None and update_data["numero"] != jugador.numero:
                 raise HTTPException(status_code=400, detail="El número de jugador no se puede modificar una vez asignado")
             # Validar que no exista otro con ese número en el equipo
             existe_numero = db.query(Jugador).filter(
