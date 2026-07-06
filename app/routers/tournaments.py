@@ -376,22 +376,11 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
 
             puntos_totales += pts_equipo
 
-            # Determinar ganador
-            sets_p = db.query(PartidoSet).filter(PartidoSet.partido_id == partido.id).all()
-            if sets_p:
-                sl = sum(1 for s in sets_p if s.marcador_local > s.marcador_visitante)
-                sv = sum(1 for s in sets_p if s.marcador_visitante > s.marcador_local)
-                if partido.equipo_local_id == equipo.id:
-                    gano = sl > sv
-                else:
-                    gano = sv > sl
-            else:
-                gano = pts_equipo > pts_rival
-
-            if gano:
+            # Determinar ganador: solo por puntos
+            if pts_equipo > pts_rival:
                 pg += 1
                 resultados.append("G")
-            elif pts_equipo < pts_rival or (sets_p and not gano and pts_equipo != pts_rival):
+            elif pts_rival > pts_equipo:
                 pp += 1
                 resultados.append("P")
             else:

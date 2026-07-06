@@ -94,20 +94,15 @@ def get_estadisticas_equipo(equipo_id: int, torneo_id: int, db: Session = Depend
 
         puntos_totales += pts_equipo
 
-        sets = db.query(PartidoSet).filter(PartidoSet.partido_id == p.id).all()
-        if sets:
-            sl = sum(1 for s in sets if s.marcador_local > s.marcador_visitante)
-            sv = sum(1 for s in sets if s.marcador_visitante > s.marcador_local)
-            gano = (sl > sv) if p.equipo_local_id == equipo_id else (sv > sl)
-        else:
-            gano = pts_equipo > pts_rival
-
-        if gano:
+        # Determinar ganador: solo por puntos
+        if pts_equipo > pts_rival:
             pg += 1
             resultados.append("G")
-        else:
+        elif pts_rival > pts_equipo:
             pp += 1
             resultados.append("P")
+        else:
+            resultados.append("E")
 
     ultimos_10 = resultados[:10]
 
