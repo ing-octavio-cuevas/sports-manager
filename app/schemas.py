@@ -672,7 +672,9 @@ class PartidoBulkResponse(BaseModel):
 
 class PartidoRolItem(BaseModel):
     equipo_local_nombre: str
+    equipo_local_logo: Optional[str] = None
     equipo_visitante_nombre: str
+    equipo_visitante_logo: Optional[str] = None
     fecha_hora: Optional[datetime]
     ubicacion_nombre: Optional[str] = None
     ubicacion_direccion: Optional[str] = None

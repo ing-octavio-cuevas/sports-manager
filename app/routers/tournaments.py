@@ -470,7 +470,9 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                 ubic = db.query(TorneoUbicacion).filter(TorneoUbicacion.id == pr.ubicacion_id).first() if pr.ubicacion_id else None
                 partidos_rol.append(PartidoRolItem(
                     equipo_local_nombre=local.nombre if local else "Desconocido",
+                    equipo_local_logo=local.logo if local else None,
                     equipo_visitante_nombre=visitante.nombre if visitante else "Desconocido",
+                    equipo_visitante_logo=visitante.logo if visitante else None,
                     fecha_hora=pr.fecha_hora,
                     ubicacion_nombre=ubic.nombre if ubic else None,
                     ubicacion_direccion=ubic.direccion if ubic else None,
