@@ -601,10 +601,10 @@ class JugadorResumenPublico(BaseModel):
     foto: Optional[str]
     estatus: bool = True
     fecha_baja: Optional[datetime] = None
-    asistencia_partidos: int = 0
-    asistencia_total_partidos: int = 0
-    asistencia_porcentaje: float = 0.0
-    asistencia_cumple: bool = True
+    asistencia_partidos: Optional[int] = None
+    asistencia_total_partidos: Optional[int] = None
+    asistencia_porcentaje: Optional[float] = None
+    asistencia_cumple: Optional[bool] = None
 
 
 class EquipoResumenCompleto(BaseModel):

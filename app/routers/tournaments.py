@@ -454,14 +454,19 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
         if equipo.mostrar_publico:
             partidos_asistencia_ids = [p.id for p in partidos_para_asistencia]
             for jug in jugadores:
-                # Contar asistencias de este jugador solo en partidos posteriores a fecha_inicio_asistencias
-                asistencias_jug = db.query(Asistencia).filter(
-                    Asistencia.jugador_id == jug.id,
-                    Asistencia.partido_id.in_(partidos_asistencia_ids),
-                ).count() if partidos_asistencia_ids else 0
+                # Campos de asistencia solo si la bandera del torneo lo permite
+                if torneo.mostrar_asistencia_publica:
+                    asistencias_jug = db.query(Asistencia).filter(
+                        Asistencia.jugador_id == jug.id,
+                        Asistencia.partido_id.in_(partidos_asistencia_ids),
+                    ).count() if partidos_asistencia_ids else 0
 
-                porcentaje_asist = round((asistencias_jug / total_partidos_equipo) * 100, 1) if total_partidos_equipo > 0 else 0.0
-                cumple = porcentaje_asist >= minimo_porcentaje if minimo_porcentaje is not None else True
+                    porcentaje_asist = round((asistencias_jug / total_partidos_equipo) * 100, 1) if total_partidos_equipo > 0 else 0.0
+                    cumple = porcentaje_asist >= minimo_porcentaje if minimo_porcentaje is not None else True
+                else:
+                    asistencias_jug = None
+                    porcentaje_asist = None
+                    cumple = None
 
                 jugadores_resumen.append(JugadorResumenPublico(
                     id=jug.id,
@@ -473,7 +478,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                     estatus=jug.estatus,
                     fecha_baja=jug.fecha_baja,
                     asistencia_partidos=asistencias_jug,
-                    asistencia_total_partidos=total_partidos_equipo,
+                    asistencia_total_partidos=total_partidos_equipo if torneo.mostrar_asistencia_publica else None,
                     asistencia_porcentaje=porcentaje_asist,
                     asistencia_cumple=cumple,
                 ))
@@ -483,7 +488,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             nombre=equipo.nombre,
             logo=equipo.logo,
             mostrar_publico=equipo.mostrar_publico,
-            jugadores=jugadores_resumen if (equipo.mostrar_publico and torneo.mostrar_asistencia_publica) else [],
+            jugadores=jugadores_resumen,
             ultimas_asistencias=ultimas_asistencias,
             estadisticas=estadisticas if equipo.mostrar_publico else None,
         ))
