@@ -20,6 +20,7 @@ from app.schemas import (
     AsistenciaResumenPartido,
     PosicionEquipo,
     JugadorResponse,
+    JugadorResumenPublico,
 )
 
 router = APIRouter(prefix="/torneos", tags=["Torneos"])
@@ -436,12 +437,53 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
             distribucion_posiciones=distribucion,
         )
 
+        # ─── Asistencia por jugador ──────────────────────────
+        # Filtrar partidos oficiales jugados a partir de fecha_inicio_asistencias
+        if torneo.fecha_inicio_asistencias:
+            partidos_para_asistencia = [
+                p for p in partidos_equipo_jugados
+                if p.fecha_hora and p.fecha_hora >= torneo.fecha_inicio_asistencias
+            ]
+        else:
+            partidos_para_asistencia = partidos_equipo_jugados
+
+        total_partidos_equipo = len(partidos_para_asistencia)
+        minimo_porcentaje = torneo.asistencia_minima_porcentaje
+
+        jugadores_resumen = []
+        if equipo.mostrar_publico:
+            partidos_asistencia_ids = [p.id for p in partidos_para_asistencia]
+            for jug in jugadores:
+                # Contar asistencias de este jugador solo en partidos posteriores a fecha_inicio_asistencias
+                asistencias_jug = db.query(Asistencia).filter(
+                    Asistencia.jugador_id == jug.id,
+                    Asistencia.partido_id.in_(partidos_asistencia_ids),
+                ).count() if partidos_asistencia_ids else 0
+
+                porcentaje_asist = round((asistencias_jug / total_partidos_equipo) * 100, 1) if total_partidos_equipo > 0 else 0.0
+                cumple = porcentaje_asist >= minimo_porcentaje if minimo_porcentaje is not None else True
+
+                jugadores_resumen.append(JugadorResumenPublico(
+                    id=jug.id,
+                    nombre=jug.nombre,
+                    numero=jug.numero,
+                    posicion=jug.posicion,
+                    es_capitan=jug.es_capitan if jug.es_capitan else False,
+                    foto=jug.foto,
+                    estatus=jug.estatus,
+                    fecha_baja=jug.fecha_baja,
+                    asistencia_partidos=asistencias_jug,
+                    asistencia_total_partidos=total_partidos_equipo,
+                    asistencia_porcentaje=porcentaje_asist,
+                    asistencia_cumple=cumple,
+                ))
+
         equipos_resumen.append(EquipoResumenCompleto(
             id=equipo.id,
             nombre=equipo.nombre,
             logo=equipo.logo,
             mostrar_publico=equipo.mostrar_publico,
-            jugadores=jugadores if equipo.mostrar_publico else [],
+            jugadores=jugadores_resumen if (equipo.mostrar_publico and torneo.mostrar_asistencia_publica) else [],
             ultimas_asistencias=ultimas_asistencias,
             estadisticas=estadisticas if equipo.mostrar_publico else None,
         ))

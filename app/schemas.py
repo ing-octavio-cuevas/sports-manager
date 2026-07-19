@@ -60,6 +60,8 @@ class TorneoCreate(BaseModel):
     numero_vueltas: Optional[int] = 2
     fecha_inicio_asistencias: Optional[datetime] = None
     horas_limite_asistencia: Optional[int] = None
+    asistencia_minima_porcentaje: Optional[float] = None
+    mostrar_asistencia_publica: Optional[bool] = False
 
 
 class TorneoUpdate(BaseModel):
@@ -73,6 +75,8 @@ class TorneoUpdate(BaseModel):
     numero_vueltas: Optional[int] = None
     fecha_inicio_asistencias: Optional[datetime] = None
     horas_limite_asistencia: Optional[int] = None
+    asistencia_minima_porcentaje: Optional[float] = None
+    mostrar_asistencia_publica: Optional[bool] = None
 
     @field_validator("fecha_inicio_asistencias", mode="before")
     @classmethod
@@ -95,6 +99,8 @@ class TorneoResponse(BaseModel):
     numero_vueltas: Optional[int]
     fecha_inicio_asistencias: Optional[datetime]
     horas_limite_asistencia: Optional[int]
+    asistencia_minima_porcentaje: Optional[float]
+    mostrar_asistencia_publica: bool
     anfitrion: AnfitrionResponse
     ubicaciones: list[TorneoUbicacionResponse] = []
 
@@ -586,12 +592,27 @@ class AsistenciaResumenPartido(BaseModel):
     total_jugadores: int
 
 
+class JugadorResumenPublico(BaseModel):
+    id: int
+    nombre: str
+    numero: Optional[int]
+    posicion: Optional[str]
+    es_capitan: bool = False
+    foto: Optional[str]
+    estatus: bool = True
+    fecha_baja: Optional[datetime] = None
+    asistencia_partidos: int = 0
+    asistencia_total_partidos: int = 0
+    asistencia_porcentaje: float = 0.0
+    asistencia_cumple: bool = True
+
+
 class EquipoResumenCompleto(BaseModel):
     id: int
     nombre: str
     logo: Optional[str]
     mostrar_publico: bool = True
-    jugadores: list[JugadorResponse] = []
+    jugadores: list[JugadorResumenPublico] = []
     ultimas_asistencias: list[AsistenciaResumenPartido] = []
     estadisticas: Optional["EstadisticasEquipo"] = None
 

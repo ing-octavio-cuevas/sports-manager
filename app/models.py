@@ -2,7 +2,7 @@
 Modelos SQLAlchemy basados en los scripts SQL proporcionados.
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, UniqueConstraint, CheckConstraint, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Numeric, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -34,6 +34,8 @@ class Torneo(Base):
     numero_vueltas = Column(Integer, default=2)
     fecha_inicio_asistencias = Column(DateTime, nullable=True)
     horas_limite_asistencia = Column(Integer, nullable=True)
+    asistencia_minima_porcentaje = Column(Float, nullable=True, default=None)
+    mostrar_asistencia_publica = Column(Boolean, default=False)
 
     # Relaciones
     anfitrion = relationship("Anfitrion", back_populates="torneos")
