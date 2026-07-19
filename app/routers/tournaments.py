@@ -337,6 +337,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
                         foto=jug.foto,
                         hora_registro=a.hora_registro,
                         manual=es_manual,
+                        es_capitan=jug.es_capitan if jug.es_capitan else False,
                     ))
 
             # Fecha del partido (ya está en hora local)

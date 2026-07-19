@@ -573,6 +573,7 @@ class JugadorAsistenciaInfo(BaseModel):
     foto: Optional[str]
     hora_registro: Optional[datetime] = None
     manual: bool = False
+    es_capitan: bool = False
 
 
 class AsistenciaResumenPartido(BaseModel):
