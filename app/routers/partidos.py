@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Partido, PartidoArbitraje, Torneo
-from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse, PartidoBulkCreate, PartidoBulkResponse
+from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse, PartidoBulkCreate, PartidoBulkResponse, ResultadosBulkRequest, ResultadosBulkResponse, ResultadoBulkError
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
 
@@ -94,6 +94,76 @@ def create_partidos_bulk(data: PartidoBulkCreate, db: Session = Depends(get_db),
     return PartidoBulkResponse(
         creados=len(partidos_creados),
         partidos=partidos_creados,
+    )
+
+
+@router.put("/resultados-bulk")
+def update_resultados_bulk(data: ResultadosBulkRequest, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """Actualizar resultados de múltiples partidos en una jornada por nombre de equipo."""
+    from app.models import Jornada, Equipo as EquipoModel
+
+    # Verificar jornada
+    jornada = db.query(Jornada).filter(Jornada.id == data.jornada_id).first()
+    if not jornada:
+        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+
+    # Verificar acceso al torneo
+    torneo = db.query(Torneo).filter(Torneo.id == jornada.torneo_id).first()
+    if ROL_ANFITRION in usuario.roles and ROL_JUGADOR not in usuario.roles and usuario.anfitrion_id:
+        if not torneo or torneo.anfitrion_id != usuario.anfitrion_id:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este recurso")
+
+    # Obtener todos los partidos de la jornada
+    partidos_jornada = db.query(Partido).filter(Partido.jornada_id == data.jornada_id).all()
+
+    # Obtener equipos del torneo para resolver nombres
+    equipos_torneo = db.query(EquipoModel).filter(EquipoModel.torneo_id == jornada.torneo_id).all()
+    # Mapa nombre (lower) -> equipo
+    equipos_por_nombre = {e.nombre.lower().strip(): e for e in equipos_torneo}
+
+    actualizados = 0
+    errores = []
+
+    for resultado in data.resultados:
+        nombre_local = resultado.equipo_local.lower().strip()
+        nombre_visitante = resultado.equipo_visitante.lower().strip()
+
+        equipo_local = equipos_por_nombre.get(nombre_local)
+        equipo_visitante = equipos_por_nombre.get(nombre_visitante)
+
+        if not equipo_local or not equipo_visitante:
+            errores.append(ResultadoBulkError(
+                equipo_local=resultado.equipo_local,
+                equipo_visitante=resultado.equipo_visitante,
+                error=f"Partido no encontrado en jornada {jornada.numero if hasattr(jornada, 'numero') else data.jornada_id}",
+            ))
+            continue
+
+        # Buscar el partido en la jornada con esos equipos
+        partido = next(
+            (p for p in partidos_jornada
+             if p.equipo_local_id == equipo_local.id and p.equipo_visitante_id == equipo_visitante.id),
+            None,
+        )
+
+        if not partido:
+            errores.append(ResultadoBulkError(
+                equipo_local=resultado.equipo_local,
+                equipo_visitante=resultado.equipo_visitante,
+                error=f"Partido no encontrado en jornada {jornada.numero if hasattr(jornada, 'numero') else data.jornada_id}",
+            ))
+            continue
+
+        partido.puntos_local = resultado.puntos_local
+        partido.puntos_visitante = resultado.puntos_visitante
+        partido.estatus = "Jugado"
+        actualizados += 1
+
+    db.commit()
+
+    return ResultadosBulkResponse(
+        actualizados=actualizados,
+        errores=errores,
     )
 
 

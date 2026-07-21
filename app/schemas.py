@@ -690,6 +690,31 @@ class PartidoBulkResponse(BaseModel):
     partidos: list[PartidoResponse] = []
 
 
+# ─── Actualización masiva de resultados ──────────────────────
+
+class ResultadoBulkItem(BaseModel):
+    equipo_local: str
+    equipo_visitante: str
+    puntos_local: int
+    puntos_visitante: int
+
+
+class ResultadosBulkRequest(BaseModel):
+    jornada_id: int
+    resultados: list[ResultadoBulkItem]
+
+
+class ResultadoBulkError(BaseModel):
+    equipo_local: str
+    equipo_visitante: str
+    error: str
+
+
+class ResultadosBulkResponse(BaseModel):
+    actualizados: int
+    errores: list[ResultadoBulkError] = []
+
+
 # ─── Rol (jornada activa) para resumen público ───────────────
 
 class PartidoRolItem(BaseModel):
