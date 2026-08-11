@@ -134,6 +134,7 @@ class EquipoUpdate(BaseModel):
 
 class EquipoResponse(BaseModel):
     id: int
+    uuid: Optional[str] = None
     torneo_id: int
     nombre: str
     logo: Optional[str]
@@ -609,6 +610,7 @@ class JugadorResumenPublico(BaseModel):
 
 class EquipoResumenCompleto(BaseModel):
     id: int
+    uuid: Optional[str] = None
     nombre: str
     logo: Optional[str]
     mostrar_publico: bool = True
@@ -713,6 +715,30 @@ class ResultadoBulkError(BaseModel):
 class ResultadosBulkResponse(BaseModel):
     actualizados: int
     errores: list[ResultadoBulkError] = []
+
+
+# ─── Resultados públicos de un equipo ────────────────────────
+
+class ResultadoPartidoPublico(BaseModel):
+    partido_id: int
+    jornada_numero: Optional[int] = None
+    fecha: Optional[datetime] = None
+    tipo: Optional[str] = None
+    equipo_local: str
+    equipo_local_logo: Optional[str] = None
+    equipo_visitante: str
+    equipo_visitante_logo: Optional[str] = None
+    puntos_local: Optional[int] = None
+    puntos_visitante: Optional[int] = None
+    resultado: Optional[str] = None  # "G", "P", "E"
+
+
+class ResultadosEquipoPublicoResponse(BaseModel):
+    equipo_id: int
+    equipo_nombre: str
+    equipo_logo: Optional[str] = None
+    torneo_nombre: Optional[str] = None
+    resultados: list[ResultadoPartidoPublico] = []
 
 
 # ─── Rol (jornada activa) para resumen público ───────────────

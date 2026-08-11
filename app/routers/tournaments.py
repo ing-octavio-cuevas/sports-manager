@@ -21,6 +21,7 @@ from app.schemas import (
     PosicionEquipo,
     JugadorResponse,
     JugadorResumenPublico,
+    ResultadosEquipoPublicoResponse,
 )
 
 router = APIRouter(prefix="/torneos", tags=["Torneos"])
@@ -227,8 +228,83 @@ def delete_ubicacion(torneo_id: int, ubicacion_id: int, db: Session = Depends(ge
     db.commit()
 
 
-@router.get("/{torneo_id}/resumen", response_model=TorneoResumenCompleto)
+@router.get("/equipo/{equipo_uuid}/resultados", response_model=ResultadosEquipoPublicoResponse)
 @limiter.limit("30/minute")
+def get_resultados_equipo_publico(request: Request, equipo_uuid: str, db: Session = Depends(get_db)):
+    """Resultados de todos los partidos oficiales jugados de un equipo (público, por UUID)."""
+    from app.models import Equipo, Jornada
+    from app.schemas import ResultadosEquipoPublicoResponse, ResultadoPartidoPublico
+    from sqlalchemy import or_
+
+    equipo = db.query(Equipo).filter(Equipo.uuid == equipo_uuid).first()
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    torneo = db.query(Torneo).filter(Torneo.id == equipo.torneo_id).first()
+
+    # Partidos oficiales jugados del equipo
+    partidos = db.query(Partido).filter(
+        Partido.torneo_id == equipo.torneo_id,
+        Partido.estatus == "Jugado",
+        Partido.tipo == "Oficial",
+        or_(
+            Partido.equipo_local_id == equipo.id,
+            Partido.equipo_visitante_id == equipo.id,
+        ),
+    ).order_by(Partido.fecha_hora.desc()).all()
+
+    # Precargar equipos del torneo para nombres/logos
+    equipos_torneo = db.query(Equipo).filter(Equipo.torneo_id == equipo.torneo_id).all()
+    equipos_map = {e.id: e for e in equipos_torneo}
+
+    resultados = []
+    for p in partidos:
+        local = equipos_map.get(p.equipo_local_id)
+        visitante = equipos_map.get(p.equipo_visitante_id)
+
+        # Determinar resultado desde la perspectiva del equipo consultado
+        if p.equipo_local_id == equipo.id:
+            pts_equipo = p.puntos_local or 0
+            pts_rival = p.puntos_visitante or 0
+        else:
+            pts_equipo = p.puntos_visitante or 0
+            pts_rival = p.puntos_local or 0
+
+        if pts_equipo > pts_rival:
+            resultado = "G"
+        elif pts_rival > pts_equipo:
+            resultado = "P"
+        else:
+            resultado = "E"
+
+        # Jornada
+        jornada = db.query(Jornada).filter(Jornada.id == p.jornada_id).first() if p.jornada_id else None
+
+        resultados.append(ResultadoPartidoPublico(
+            partido_id=p.id,
+            jornada_numero=jornada.numero if jornada else None,
+            fecha=p.fecha_hora,
+            tipo=p.tipo,
+            equipo_local=local.nombre if local else "Desconocido",
+            equipo_local_logo=local.logo if local else None,
+            equipo_visitante=visitante.nombre if visitante else "Desconocido",
+            equipo_visitante_logo=visitante.logo if visitante else None,
+            puntos_local=p.puntos_local,
+            puntos_visitante=p.puntos_visitante,
+            resultado=resultado,
+        ))
+
+    return ResultadosEquipoPublicoResponse(
+        equipo_id=equipo.id,
+        equipo_nombre=equipo.nombre,
+        equipo_logo=equipo.logo,
+        torneo_nombre=torneo.nombre if torneo else None,
+        resultados=resultados,
+    )
+
+
+@router.get("/{torneo_id}/resumen", response_model=TorneoResumenCompleto)
+@limiter.limit("15/minute")
 def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(get_db)):
     """Resumen completo de un torneo (público, con rate limit)."""
     from app.models import Equipo, Jugador, PartidoSet, Asistencia, Jornada
@@ -485,6 +561,7 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
 
         equipos_resumen.append(EquipoResumenCompleto(
             id=equipo.id,
+            uuid=equipo.uuid,
             nombre=equipo.nombre,
             logo=equipo.logo,
             mostrar_publico=equipo.mostrar_publico,

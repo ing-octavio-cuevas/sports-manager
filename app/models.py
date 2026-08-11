@@ -4,6 +4,7 @@ Modelos SQLAlchemy basados en los scripts SQL proporcionados.
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Numeric, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
+import uuid as uuid_lib
 
 from app.database import Base
 
@@ -62,6 +63,7 @@ class Equipo(Base):
     __tablename__ = "equipo"
 
     id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(36), unique=True, index=True, default=lambda: str(uuid_lib.uuid4()))
     torneo_id = Column(Integer, ForeignKey("torneo.id", ondelete="CASCADE"), nullable=False)
     nombre = Column(String(500), nullable=False)
     logo = Column(String(500), nullable=True)
