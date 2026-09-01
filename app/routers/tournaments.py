@@ -36,6 +36,123 @@ def _verificar_acceso_torneo(torneo, usuario):
             raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
 
 
+def _calcular_asistencia_equipo(db, equipo, jugadores_equipo, partidos_jugados, jornadas, equipos_map, fecha_inicio):
+    """
+    Calcula el detalle de asistencia de un equipo (jugadores + matriz por jornada).
+    Devuelve un DashboardAsistenciaEquipo. El conteo es por PARTIDO (un equipo puede
+    jugar N partidos por jornada). Reutilizado por el dashboard y por el endpoint de detalle.
+    """
+    from datetime import datetime as _dt
+    from app.models import Asistencia
+    from app.schemas import (
+        DashboardAsistenciaEquipo, DashboardAsistenciaJugador,
+        DashboardAsistenciaJornada, DashboardAsistenciaPartido,
+    )
+
+    jornada_numero_por_id = {jor.id: jor.numero for jor in jornadas}
+    numeros_jornadas = [jor.numero for jor in jornadas]
+
+    # Partidos oficiales jugados del equipo (respetando fecha_inicio)
+    partidos_equipo = [
+        p for p in partidos_jugados
+        if (p.equipo_local_id == equipo.id or p.equipo_visitante_id == equipo.id)
+        and (not fecha_inicio or (p.fecha_hora and p.fecha_hora >= fecha_inicio))
+    ]
+    partidos_equipo.sort(key=lambda p: (jornada_numero_por_id.get(p.jornada_id, 0), p.fecha_hora or _dt.min))
+    partido_ids_equipo = [p.id for p in partidos_equipo]
+
+    # Agrupar partidos del equipo por jornada (preservando orden)
+    partidos_por_jornada = {}
+    for p in partidos_equipo:
+        partidos_por_jornada.setdefault(p.jornada_id, []).append(p)
+    orden_jornadas = sorted(
+        partidos_por_jornada.keys(),
+        key=lambda jid: jornada_numero_por_id.get(jid, 0),
+    )
+
+    def _rival_nombre(p):
+        rival_id = p.equipo_visitante_id if p.equipo_local_id == equipo.id else p.equipo_local_id
+        rival = equipos_map.get(rival_id)
+        return rival.nombre if rival else "Desconocido"
+
+    # Asistencias registradas de los jugadores del equipo
+    asistencias_registradas = set()
+    if partido_ids_equipo and jugadores_equipo:
+        regs = db.query(Asistencia).filter(
+            Asistencia.partido_id.in_(partido_ids_equipo),
+            Asistencia.jugador_id.in_([j.id for j in jugadores_equipo]),
+        ).all()
+        for r in regs:
+            asistencias_registradas.add((r.jugador_id, r.partido_id))
+
+    total_partidos_equipo = len(partidos_equipo)
+
+    jugadores_dash = []
+    asistencias_totales_equipo = 0
+    for j in jugadores_equipo:
+        asistio = 0
+        por_jornada = []
+        for jid in orden_jornadas:
+            partidos_jor = partidos_por_jornada[jid]
+            detalle_partidos = []
+            asistio_jornada = 0
+            for p in partidos_jor:
+                presente = (j.id, p.id) in asistencias_registradas
+                if presente:
+                    asistio_jornada += 1
+                    asistio += 1
+                detalle_partidos.append(DashboardAsistenciaPartido(
+                    partido_id=p.id,
+                    rival=_rival_nombre(p),
+                    fecha_hora=p.fecha_hora,
+                    estado="presente" if presente else "ausente",
+                ))
+
+            total_jor = len(partidos_jor)
+            if asistio_jornada == 0:
+                estado_jornada = "ausente"
+            elif asistio_jornada == total_jor:
+                estado_jornada = "presente"
+            else:
+                estado_jornada = "parcial"
+
+            por_jornada.append(DashboardAsistenciaJornada(
+                jornada=jornada_numero_por_id.get(jid, 0),
+                estado=estado_jornada,
+                asistencias=asistio_jornada,
+                total_partidos=total_jor,
+                partidos=detalle_partidos,
+            ))
+
+        porcentaje = round((asistio / total_partidos_equipo) * 100, 1) if total_partidos_equipo > 0 else 0.0
+        asistencias_totales_equipo += asistio
+        jugadores_dash.append(DashboardAsistenciaJugador(
+            id=j.id,
+            nombre=j.nombre,
+            numero=j.numero,
+            posicion=j.posicion,
+            foto=j.foto,
+            asistencias=asistio,
+            total=total_partidos_equipo,
+            porcentaje=porcentaje,
+            por_jornada=por_jornada,
+        ))
+
+    asistencias_posibles = total_partidos_equipo * len(jugadores_equipo)
+    promedio_equipo = round((asistencias_totales_equipo / asistencias_posibles) * 100, 1) if asistencias_posibles > 0 else 0.0
+
+    return DashboardAsistenciaEquipo(
+        equipo_id=equipo.id,
+        equipo_nombre=equipo.nombre,
+        equipo_logo=equipo.logo,
+        jornadas=numeros_jornadas,
+        promedio_asistencia=promedio_equipo,
+        asistencias_totales=asistencias_totales_equipo,
+        asistencias_posibles=asistencias_posibles,
+        jugadores=jugadores_dash,
+    )
+
+
 @router.post("", response_model=TorneoResponse, status_code=201)
 def create_torneo(torneo: TorneoCreate, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Crear un nuevo torneo."""
@@ -821,120 +938,24 @@ def get_torneo_dashboard(torneo_id: int, db: Session = Depends(get_db), usuario=
             fecha=ev.fecha,
         ))
 
-    # ─── Asistencias por equipo ──────────────────────────────
-    numeros_jornadas = [jor.numero for jor in jornadas]
+    # ─── Asistencias por equipo (resumen ligero) ────────────
+    # El detalle completo (jugadores + matriz por jornada) se sirve en
+    # GET /torneos/{id}/asistencias/equipo/{equipoId} bajo demanda.
+    from app.schemas import DashboardAsistenciaEquipoResumen
 
-    # Filtro fecha_inicio_asistencias
     fecha_inicio = torneo.fecha_inicio_asistencias
-
-    jornada_numero_por_id = {jor.id: jor.numero for jor in jornadas}
 
     asistencias_por_equipo = []
     for e in equipos:
         jugadores_equipo = [j for j in jugadores if j.equipo_id == e.id]
-
-        # Partidos oficiales jugados del equipo (respetando fecha_inicio)
-        partidos_equipo = [
-            p for p in partidos_jugados
-            if (p.equipo_local_id == e.id or p.equipo_visitante_id == e.id)
-            and (not fecha_inicio or (p.fecha_hora and p.fecha_hora >= fecha_inicio))
-        ]
-        # Un equipo puede tener N partidos por jornada: se cuenta por PARTIDO, no por jornada.
-        partidos_equipo.sort(key=lambda p: (jornada_numero_por_id.get(p.jornada_id, 0), p.fecha_hora or dt_dash.min))
-        partido_ids_equipo = [p.id for p in partidos_equipo]
-
-        # Agrupar partidos del equipo por jornada (preservando orden)
-        partidos_por_jornada = {}
-        for p in partidos_equipo:
-            partidos_por_jornada.setdefault(p.jornada_id, []).append(p)
-        # Orden de jornadas que el equipo jugó
-        orden_jornadas = sorted(
-            partidos_por_jornada.keys(),
-            key=lambda jid: jornada_numero_por_id.get(jid, 0),
+        detalle = _calcular_asistencia_equipo(
+            db, e, jugadores_equipo, partidos_jugados, jornadas, equipos_map, fecha_inicio,
         )
-
-        # Rival por partido
-        def _rival_nombre(p):
-            rival_id = p.equipo_visitante_id if p.equipo_local_id == e.id else p.equipo_local_id
-            rival = equipos_map.get(rival_id)
-            return rival.nombre if rival else "Desconocido"
-
-        # Asistencias registradas de los jugadores del equipo
-        asistencias_registradas = set()
-        if partido_ids_equipo and jugadores_equipo:
-            regs = db.query(Asistencia).filter(
-                Asistencia.partido_id.in_(partido_ids_equipo),
-                Asistencia.jugador_id.in_([j.id for j in jugadores_equipo]),
-            ).all()
-            for r in regs:
-                asistencias_registradas.add((r.jugador_id, r.partido_id))
-
-        total_partidos_equipo = len(partidos_equipo)
-
-        jugadores_dash = []
-        asistencias_totales_equipo = 0
-        for j in jugadores_equipo:
-            asistio = 0
-            por_jornada = []
-            # Una entrada por jornada, con el detalle de cada partido de esa jornada
-            for jid in orden_jornadas:
-                partidos_jor = partidos_por_jornada[jid]
-                detalle_partidos = []
-                asistio_jornada = 0
-                for p in partidos_jor:
-                    presente = (j.id, p.id) in asistencias_registradas
-                    if presente:
-                        asistio_jornada += 1
-                        asistio += 1
-                    detalle_partidos.append(DashboardAsistenciaPartido(
-                        partido_id=p.id,
-                        rival=_rival_nombre(p),
-                        fecha_hora=p.fecha_hora,
-                        estado="presente" if presente else "ausente",
-                    ))
-
-                total_jor = len(partidos_jor)
-                if asistio_jornada == 0:
-                    estado_jornada = "ausente"
-                elif asistio_jornada == total_jor:
-                    estado_jornada = "presente"
-                else:
-                    estado_jornada = "parcial"
-
-                por_jornada.append(DashboardAsistenciaJornada(
-                    jornada=jornada_numero_por_id.get(jid, 0),
-                    estado=estado_jornada,
-                    asistencias=asistio_jornada,
-                    total_partidos=total_jor,
-                    partidos=detalle_partidos,
-                ))
-
-            porcentaje = round((asistio / total_partidos_equipo) * 100, 1) if total_partidos_equipo > 0 else 0.0
-            asistencias_totales_equipo += asistio
-            jugadores_dash.append(DashboardAsistenciaJugador(
-                id=j.id,
-                nombre=j.nombre,
-                numero=j.numero,
-                posicion=j.posicion,
-                foto=j.foto,
-                asistencias=asistio,
-                total=total_partidos_equipo,
-                porcentaje=porcentaje,
-                por_jornada=por_jornada,
-            ))
-
-        asistencias_posibles = total_partidos_equipo * len(jugadores_equipo)
-        promedio_equipo = round((asistencias_totales_equipo / asistencias_posibles) * 100, 1) if asistencias_posibles > 0 else 0.0
-
-        asistencias_por_equipo.append(DashboardAsistenciaEquipo(
+        asistencias_por_equipo.append(DashboardAsistenciaEquipoResumen(
             equipo_id=e.id,
             equipo_nombre=e.nombre,
             equipo_logo=e.logo,
-            jornadas=numeros_jornadas,
-            promedio_asistencia=promedio_equipo,
-            asistencias_totales=asistencias_totales_equipo,
-            asistencias_posibles=asistencias_posibles,
-            jugadores=jugadores_dash,
+            promedio_asistencia=detalle.promedio_asistencia,
         ))
 
     return DashboardTorneoResponse(
@@ -952,6 +973,37 @@ def get_torneo_dashboard(torneo_id: int, db: Session = Depends(get_db), usuario=
         estadisticas_generales=estadisticas_generales,
         finanzas=finanzas,
         asistencias_por_equipo=asistencias_por_equipo,
+    )
+
+
+@router.get("/{torneo_id}/asistencias/equipo/{equipo_id}")
+def get_asistencia_equipo_detalle(torneo_id: int, equipo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
+    """Detalle de asistencia de un equipo: jugadores + matriz por jornada. Bajo demanda."""
+    from app.models import Equipo, Jugador, Jornada
+
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+    _verificar_acceso_torneo(torneo, usuario)
+
+    equipo = db.query(Equipo).filter(Equipo.id == equipo_id, Equipo.torneo_id == torneo_id).first()
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado en este torneo")
+
+    jugadores_equipo = db.query(Jugador).filter(Jugador.equipo_id == equipo_id).all()
+    jornadas = db.query(Jornada).filter(Jornada.torneo_id == torneo_id).order_by(Jornada.numero).all()
+
+    # Partidos oficiales jugados del torneo + mapa de equipos para nombres de rival
+    partidos_jugados = db.query(Partido).filter(
+        Partido.torneo_id == torneo_id,
+        Partido.estatus == "Jugado",
+        Partido.tipo == "Oficial",
+    ).all()
+    equipos_map = {e.id: e for e in db.query(Equipo).filter(Equipo.torneo_id == torneo_id).all()}
+
+    return _calcular_asistencia_equipo(
+        db, equipo, jugadores_equipo, partidos_jugados, jornadas,
+        equipos_map, torneo.fecha_inicio_asistencias,
     )
 
 

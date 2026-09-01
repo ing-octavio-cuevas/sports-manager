@@ -875,6 +875,14 @@ class DashboardAsistenciaJugador(BaseModel):
     por_jornada: list[DashboardAsistenciaJornada] = []
 
 
+class DashboardAsistenciaEquipoResumen(BaseModel):
+    """Resumen ligero por equipo para el dashboard (sin jugadores)."""
+    equipo_id: int
+    equipo_nombre: str
+    equipo_logo: Optional[str] = None
+    promedio_asistencia: float = 0.0
+
+
 class DashboardAsistenciaEquipo(BaseModel):
     equipo_id: int
     equipo_nombre: str
@@ -894,4 +902,4 @@ class DashboardTorneoResponse(BaseModel):
     actividad_reciente: list[DashboardActividad] = []
     estadisticas_generales: DashboardEstadisticasGenerales
     finanzas: DashboardFinanzas
-    asistencias_por_equipo: list[DashboardAsistenciaEquipo] = []
+    asistencias_por_equipo: list[DashboardAsistenciaEquipoResumen] = []
