@@ -848,9 +848,19 @@ class DashboardFinanzas(BaseModel):
     porcentaje_pagado: int = 0
 
 
+class DashboardAsistenciaPartido(BaseModel):
+    partido_id: int
+    rival: Optional[str] = None
+    fecha_hora: Optional[datetime] = None
+    estado: str  # presente | ausente | justificado | na
+
+
 class DashboardAsistenciaJornada(BaseModel):
     jornada: int
-    estado: str  # presente | ausente | justificado | na
+    estado: str  # presente | ausente | parcial | na  (resumen de la jornada)
+    asistencias: int = 0          # partidos de la jornada a los que asistió
+    total_partidos: int = 0       # partidos que el equipo jugó en la jornada
+    partidos: list[DashboardAsistenciaPartido] = []
 
 
 class DashboardAsistenciaJugador(BaseModel):
@@ -861,7 +871,7 @@ class DashboardAsistenciaJugador(BaseModel):
     foto: Optional[str] = None
     asistencias: int = 0
     total: int = 0
-    porcentaje: int = 0
+    porcentaje: float = 0.0
     por_jornada: list[DashboardAsistenciaJornada] = []
 
 
@@ -870,7 +880,7 @@ class DashboardAsistenciaEquipo(BaseModel):
     equipo_nombre: str
     equipo_logo: Optional[str] = None
     jornadas: list[int] = []
-    promedio_asistencia: int = 0
+    promedio_asistencia: float = 0.0
     asistencias_totales: int = 0
     asistencias_posibles: int = 0
     jugadores: list[DashboardAsistenciaJugador] = []
