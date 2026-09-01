@@ -758,3 +758,130 @@ class RolJornada(BaseModel):
     jornada_numero: Optional[int] = None
     jornada_fecha: Optional[datetime] = None
     partidos: list[PartidoRolItem] = []
+
+
+# ─── Auditoría ───────────────────────────────────────────────
+
+class EventoAuditoriaResponse(BaseModel):
+    id: int
+    tipo_evento: str
+    usuario_id: Optional[int] = None
+    usuario_nombre: Optional[str] = None
+    partido_id: Optional[int] = None
+    equipo_id: Optional[int] = None
+    jugador_id: Optional[int] = None
+    descripcion: Optional[str] = None
+    detalle: Optional[dict] = None
+    ip: Optional[str] = None
+    fecha: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class EventosAuditoriaPaginados(BaseModel):
+    eventos: list[EventoAuditoriaResponse] = []
+    total: int
+    page: int
+    pages: int
+
+
+# ─── Dashboard del torneo (anfitrión) ────────────────────────
+
+class DashboardTorneoInfo(BaseModel):
+    id: int
+    nombre: str
+    periodo: Optional[str] = None
+    categoria: Optional[str] = None
+    logo: Optional[str] = None
+
+
+class DashboardKpis(BaseModel):
+    equipos: int = 0
+    jugadores_total: int = 0
+    jugadores_activos: int = 0
+    jugadores_baja: int = 0
+    partidos_jugados: int = 0
+    partidos_programados: int = 0
+    jornadas_completadas: int = 0
+    jornadas_total: int = 0
+    avance_porcentaje: int = 0
+
+
+class DashboardProximoPartido(BaseModel):
+    fecha_hora: Optional[datetime] = None
+    local_nombre: str
+    local_logo: Optional[str] = None
+    visitante_nombre: str
+    visitante_logo: Optional[str] = None
+    cancha: Optional[str] = None
+
+
+class DashboardPosicion(BaseModel):
+    equipo_id: int
+    equipo_nombre: str
+    equipo_logo: Optional[str] = None
+    pj: int = 0
+    pg: int = 0
+    pp: int = 0
+    pf: int = 0   # Puntos a favor
+    pc: int = 0   # Puntos en contra
+    pts: int = 0
+
+
+class DashboardActividad(BaseModel):
+    tipo: str  # resultado | inscripcion | pago | jugador | jornada
+    descripcion: str
+    fecha: Optional[datetime] = None
+
+
+class DashboardEstadisticasGenerales(BaseModel):
+    sets_jugados: int = 0
+    puntos_totales: int = 0
+    promedio_por_set: float = 0.0
+    partidos_por_jugar: int = 0
+    tendencia_puntos: list[int] = []
+
+
+class DashboardFinanzas(BaseModel):
+    ingresos_totales: float = 0.0
+    pendientes: float = 0.0
+    porcentaje_pagado: int = 0
+
+
+class DashboardAsistenciaJornada(BaseModel):
+    jornada: int
+    estado: str  # presente | ausente | justificado | na
+
+
+class DashboardAsistenciaJugador(BaseModel):
+    id: int
+    nombre: str
+    numero: Optional[int] = None
+    posicion: Optional[str] = None
+    foto: Optional[str] = None
+    asistencias: int = 0
+    total: int = 0
+    porcentaje: int = 0
+    por_jornada: list[DashboardAsistenciaJornada] = []
+
+
+class DashboardAsistenciaEquipo(BaseModel):
+    equipo_id: int
+    equipo_nombre: str
+    equipo_logo: Optional[str] = None
+    jornadas: list[int] = []
+    promedio_asistencia: int = 0
+    asistencias_totales: int = 0
+    asistencias_posibles: int = 0
+    jugadores: list[DashboardAsistenciaJugador] = []
+
+
+class DashboardTorneoResponse(BaseModel):
+    torneo: DashboardTorneoInfo
+    kpis: DashboardKpis
+    proximos_partidos: list[DashboardProximoPartido] = []
+    tabla_posiciones: list[DashboardPosicion] = []
+    actividad_reciente: list[DashboardActividad] = []
+    estadisticas_generales: DashboardEstadisticasGenerales
+    finanzas: DashboardFinanzas
+    asistencias_por_equipo: list[DashboardAsistenciaEquipo] = []

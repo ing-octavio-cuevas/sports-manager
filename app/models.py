@@ -2,7 +2,7 @@
 Modelos SQLAlchemy basados en los scripts SQL proporcionados.
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Numeric, UniqueConstraint, CheckConstraint, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Numeric, JSON, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
 import uuid as uuid_lib
 
@@ -220,6 +220,30 @@ class Asistencia(Base):
     partido = relationship("Partido")
     jugador = relationship("Jugador", foreign_keys=[jugador_id])
     capitan = relationship("Jugador", foreign_keys=[registrado_por])
+
+
+class EventoAuditoria(Base):
+    """
+    Registro de eventos para auditoría y resolución de reclamos.
+    tipo_evento: LOGIN, ASISTENCIA_REGISTRO, ASISTENCIA_MODIFICACION, ASISTENCIA_ELIMINACION, etc.
+    """
+    __tablename__ = "evento_auditoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo_evento = Column(String(50), nullable=False, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=True, index=True)
+    # Contexto opcional según el evento
+    partido_id = Column(Integer, ForeignKey("partido.id"), nullable=True, index=True)
+    equipo_id = Column(Integer, ForeignKey("equipo.id"), nullable=True, index=True)
+    jugador_id = Column(Integer, ForeignKey("jugador.id"), nullable=True)
+    # Descripción legible y detalle estructurado
+    descripcion = Column(String(1000), nullable=True)
+    detalle = Column(JSON, nullable=True)
+    ip = Column(String(64), nullable=True)
+    fecha = Column(DateTime, server_default=func.now(), index=True)
+
+    # Relación (solo lectura de conveniencia)
+    usuario = relationship("Usuario", foreign_keys=[usuario_id])
 
 
 class Usuario(Base):

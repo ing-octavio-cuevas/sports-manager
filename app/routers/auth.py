@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Usuario
 from app.schemas import LoginRequest, TokenResponse, UsuarioResponse
 from app.auth import create_access_token, get_current_user
+from app.audit import registrar_evento, TipoEvento
 from pydantic import BaseModel
 from typing import Optional
 
@@ -15,8 +16,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Iniciar sesión con celular + password."""
+    ip = request.client.host if request.client else None
     usuario = db.query(Usuario).filter(Usuario.celular == data.celular).first()
     if not usuario or not pwd_context.verify(data.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
@@ -34,6 +36,17 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=403, detail="No estás inscrito en ningún torneo activo")
 
     token = create_access_token(data={"sub": str(usuario.id)})
+
+    # Auditoría: inicio de sesión exitoso
+    registrar_evento(
+        db,
+        TipoEvento.LOGIN,
+        usuario_id=usuario.id,
+        descripcion=f"Inicio de sesión de {usuario.nombre}",
+        detalle={"celular": usuario.celular, "roles": usuario.roles},
+        ip=ip,
+    )
+    db.commit()
 
     return TokenResponse(
         access_token=token,

@@ -7,6 +7,7 @@ from app.models import Asistencia, Partido, Jugador, Equipo
 from app.schemas import AsistenciaCreate, AsistenciaResponse, PartidoCapitanResponse, AsistenciaResumenEquipo, AsistenciaResumenJugador, AsistenciaManualCreate
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
+from app.audit import registrar_evento, TipoEvento
 
 router = APIRouter(prefix="/asistencias", tags=["Asistencias"])
 
@@ -252,6 +253,18 @@ def registrar_asistencia_lote(data: AsistenciaCreate, db: Session = Depends(get_
             jugador_foto=jugador.foto,
         ))
 
+    # Auditoría: registro de asistencia por capitán
+    registrar_evento(
+        db,
+        TipoEvento.ASISTENCIA_REGISTRO,
+        usuario_id=usuario.id,
+        partido_id=data.partido_id,
+        equipo_id=capitan.equipo_id,
+        jugador_id=capitan.id,
+        descripcion=f"Registro de asistencia por capitán ({len(data.jugador_ids)} jugadores)",
+        detalle={"jugador_ids": data.jugador_ids, "metodo": "manual", "origen": "capitan"},
+    )
+
     db.commit()
     return resultado
 
@@ -429,6 +442,17 @@ def eliminar_asistencia_manual(data: AsistenciaManualDelete, db: Session = Depen
         Asistencia.partido_id == data.partido_id,
         Asistencia.jugador_id.in_(data.jugador_ids),
     ).delete(synchronize_session=False)
+
+    # Auditoría: eliminación de asistencias por anfitrión
+    registrar_evento(
+        db,
+        TipoEvento.ASISTENCIA_ELIMINACION,
+        usuario_id=usuario.id,
+        partido_id=data.partido_id,
+        descripcion=f"Eliminación de asistencias por anfitrión ({len(data.jugador_ids)} jugadores)",
+        detalle={"jugador_ids": data.jugador_ids, "origen": "anfitrion"},
+    )
+
     db.commit()
 
 
@@ -438,6 +462,18 @@ def delete_asistencia(asistencia_id: int, db: Session = Depends(get_db), usuario
     asistencia = db.query(Asistencia).filter(Asistencia.id == asistencia_id).first()
     if not asistencia:
         raise HTTPException(status_code=404, detail="Asistencia no encontrada")
+
+    # Auditoría: eliminación de una asistencia individual
+    registrar_evento(
+        db,
+        TipoEvento.ASISTENCIA_ELIMINACION,
+        usuario_id=usuario.id,
+        partido_id=asistencia.partido_id,
+        jugador_id=asistencia.jugador_id,
+        descripcion="Eliminación de asistencia individual por anfitrión",
+        detalle={"asistencia_id": asistencia_id, "origen": "anfitrion"},
+    )
+
     db.delete(asistencia)
     db.commit()
 
@@ -480,6 +516,19 @@ def registrar_asistencia_arbitro(partido_id: int, jugador_id: int, db: Session =
         metodo="qr",
     )
     db.add(db_asistencia)
+
+    # Auditoría: registro de asistencia por árbitro (QR)
+    registrar_evento(
+        db,
+        TipoEvento.ASISTENCIA_REGISTRO,
+        usuario_id=usuario.id,
+        partido_id=partido_id,
+        equipo_id=jugador.equipo_id,
+        jugador_id=jugador_id,
+        descripcion=f"Registro de asistencia por árbitro (QR) de {jugador.nombre}",
+        detalle={"metodo": "qr", "origen": "arbitro"},
+    )
+
     db.commit()
     db.refresh(db_asistencia)
 
@@ -556,6 +605,17 @@ def registrar_asistencia_manual(data: AsistenciaManualCreate, db: Session = Depe
             jugador_numero=jugador.numero,
             jugador_foto=jugador.foto,
         ))
+
+    # Auditoría: registro/modificación manual de asistencia por anfitrión
+    registrar_evento(
+        db,
+        TipoEvento.ASISTENCIA_MODIFICACION,
+        usuario_id=usuario.id,
+        partido_id=data.partido_id,
+        equipo_id=data.equipo_id,
+        descripcion=f"Registro manual de asistencia por anfitrión ({len(resultado)} jugadores)",
+        detalle={"jugador_ids": data.jugador_ids, "metodo": "manual", "origen": "anfitrion"},
+    )
 
     db.commit()
     return resultado

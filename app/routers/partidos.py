@@ -6,6 +6,7 @@ from app.models import Partido, PartidoArbitraje, Torneo
 from app.schemas import PartidoCreate, PartidoUpdate, PartidoResponse, PartidoBulkCreate, PartidoBulkResponse, ResultadosBulkRequest, ResultadosBulkResponse, ResultadoBulkError
 from app.auth import require_role
 from app.config import ROL_ANFITRION, ROL_JUGADOR
+from app.audit import registrar_evento, TipoEvento
 
 router = APIRouter(prefix="/partidos", tags=["Partidos"])
 
@@ -154,10 +155,29 @@ def update_resultados_bulk(data: ResultadosBulkRequest, db: Session = Depends(ge
             ))
             continue
 
+        # Capturar score anterior para auditoría
+        puntos_local_anterior = partido.puntos_local
+        puntos_visitante_anterior = partido.puntos_visitante
+
         partido.puntos_local = resultado.puntos_local
         partido.puntos_visitante = resultado.puntos_visitante
         partido.estatus = "Jugado"
         actualizados += 1
+
+        # Auditoría: registrar cambio de marcador
+        registrar_evento(
+            db,
+            TipoEvento.SCORE_MODIFICACION,
+            usuario_id=usuario.id,
+            partido_id=partido.id,
+            descripcion=f"Modificación de marcador del partido {partido.id} (carga masiva)",
+            detalle={
+                "anterior": {"puntos_local": puntos_local_anterior, "puntos_visitante": puntos_visitante_anterior},
+                "nuevo": {"puntos_local": resultado.puntos_local, "puntos_visitante": resultado.puntos_visitante},
+                "origen": "resultados_bulk",
+                "jornada_id": data.jornada_id,
+            },
+        )
 
     db.commit()
 
@@ -238,8 +258,33 @@ def update_partido(partido_id: int, partido_data: PartidoUpdate, db: Session = D
     visitante = data.get("equipo_visitante_id", partido.equipo_visitante_id)
     if local == visitante:
         raise HTTPException(status_code=400, detail="Un equipo no puede jugar contra sí mismo")
+
+    # Capturar score anterior para auditoría
+    puntos_local_anterior = partido.puntos_local
+    puntos_visitante_anterior = partido.puntos_visitante
+
     for field, value in data.items():
         setattr(partido, field, value)
+
+    # Auditoría: registrar si cambió el marcador
+    cambio_score = (
+        ("puntos_local" in data and data["puntos_local"] != puntos_local_anterior)
+        or ("puntos_visitante" in data and data["puntos_visitante"] != puntos_visitante_anterior)
+    )
+    if cambio_score:
+        registrar_evento(
+            db,
+            TipoEvento.SCORE_MODIFICACION,
+            usuario_id=usuario.id,
+            partido_id=partido.id,
+            descripcion=f"Modificación de marcador del partido {partido.id}",
+            detalle={
+                "anterior": {"puntos_local": puntos_local_anterior, "puntos_visitante": puntos_visitante_anterior},
+                "nuevo": {"puntos_local": partido.puntos_local, "puntos_visitante": partido.puntos_visitante},
+                "origen": "update_partido",
+            },
+        )
+
     db.commit()
     db.refresh(partido)
     return partido

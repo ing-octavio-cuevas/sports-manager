@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 import os
 
 from app.database import engine, Base
-from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, partidos, partido_arbitraje, partido_sets, asistencias, usuarios, auth
+from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, partidos, partido_arbitraje, partido_sets, asistencias, usuarios, auth, auditoria
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -48,6 +48,7 @@ app.include_router(partido_sets.router)
 app.include_router(asistencias.router)
 app.include_router(usuarios.router)
 app.include_router(auth.router)
+app.include_router(auditoria.router)
 
 # Servir archivos estáticos (fotos)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
