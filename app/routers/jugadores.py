@@ -334,6 +334,10 @@ def update_jugador(jugador_id: int, jugador_data: JugadorUpdate, db: Session = D
         if jugador.equipo_id not in mis_equipos:
             raise HTTPException(status_code=403, detail="Solo puedes editar jugadores de tu propio equipo")
 
+    # Si el jugador ya está registrado como Entrenador, no puede ser editado
+    if jugador.posicion and jugador.posicion.strip().lower() == "entrenador":
+        raise HTTPException(status_code=400, detail="Un jugador registrado como Entrenador no puede ser editado")
+
     update_data = jugador_data.model_dump(exclude_unset=True)
     celular = update_data.pop("celular", None)
     email = update_data.pop("email", None)
