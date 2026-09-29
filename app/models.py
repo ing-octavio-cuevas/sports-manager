@@ -271,3 +271,27 @@ class Usuario(Base):
     # Relaciones
     jugadores = relationship("Jugador", back_populates="usuario")
     anfitrion = relationship("Anfitrion")
+
+
+class RecordatorioAsistencia(Base):
+    """
+    Marca que ya se envió un recordatorio de asistencia por WhatsApp a un capitán
+    en un día dado. Evita reenviar en cada corrida del scheduler: un capitán recibe
+    como máximo un recordatorio por día, aunque tenga varios partidos pendientes.
+
+    estado: 'enviado' | 'error' — se guarda incluso el error para diagnóstico y
+    para no reintentar en bucle dentro del mismo día.
+    """
+    __tablename__ = "recordatorio_asistencia"
+    __table_args__ = (
+        UniqueConstraint("capitan_id", "fecha_dia", name="uq_recordatorio_capitan_dia"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    capitan_id = Column(Integer, ForeignKey("jugador.id"), nullable=False, index=True)
+    fecha_dia = Column(Date, nullable=False, index=True)  # día local (UTC-6) del recordatorio
+    celular = Column(String(20), nullable=True)
+    num_partidos = Column(Integer, nullable=True)  # cuántos partidos pendientes se recordaron
+    estado = Column(String(20), nullable=False, default="enviado")  # "enviado" | "error"
+    detalle = Column(String(1000), nullable=True)
+    fecha_envio = Column(DateTime, server_default=func.now())

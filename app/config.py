@@ -43,6 +43,46 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "")
 
+# ─── WhatsApp Cloud API ──────────────────────────────────────
+# Credenciales de la WhatsApp Cloud API (Meta). Se configuran en el .env del servidor.
+#   WHATSAPP_TOKEN     : token de acceso permanente del System User de Meta
+#   WHATSAPP_PHONE_ID  : Phone Number ID del número emisor (no el número en sí)
+#   WHATSAPP_API_VERSION : versión del Graph API (ej. "v21.0")
+
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
+WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v21.0")
+
+# Nombre e idioma de la plantilla (template) pre-aprobada en Meta para el recordatorio.
+WHATSAPP_TEMPLATE_RECORDATORIO = os.getenv("WHATSAPP_TEMPLATE_RECORDATORIO", "recordatorio_asistencia")
+WHATSAPP_TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "es_MX")
+
+# Código de país por defecto para normalizar celulares a formato E.164 (México = 52).
+WHATSAPP_DEFAULT_COUNTRY_CODE = os.getenv("WHATSAPP_DEFAULT_COUNTRY_CODE", "52")
+
+# True solo si hay token y phone id configurados.
+WHATSAPP_ENABLED = bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID)
+
+# ─── Recordatorios de asistencia ─────────────────────────────
+# El job corre a horas fijas (hora local UTC-6) y revisa si algún capitán tiene
+# asistencias pendientes por registrar, dentro del horario permitido y en partidos
+# aún no terminados. Lista de horas separadas por coma (formato 24h).
+_reminder_hours_raw = os.getenv("REMINDER_HOURS", "8,20")
+REMINDER_HOURS = [
+    int(h.strip()) for h in _reminder_hours_raw.split(",") if h.strip().isdigit()
+]
+# Interruptor general del scheduler de recordatorios.
+REMINDER_ENABLED = os.getenv("REMINDER_ENABLED", "true").lower() in ("1", "true", "yes")
+
+# ─── Prueba controlada (temporal) ────────────────────────────
+# Si se definen ambas, al arrancar la app se programa UN envío de prueba a la hora
+# indicada (hora local UTC-6, formato HH:MM) al número dado, con datos dummy.
+# Sirve para validar la integración con Meta sin depender de datos reales.
+# Dejar vacías en operación normal.
+TEST_REMINDER_TIME = os.getenv("TEST_REMINDER_TIME", "")          # ej. "16:30"
+TEST_REMINDER_CELULAR = os.getenv("TEST_REMINDER_CELULAR", "")    # ej. "525512345678"
+TEST_REMINDER_NOMBRE = os.getenv("TEST_REMINDER_NOMBRE", "Capitán de Prueba")
+
 # ─── Roles ───────────────────────────────────────────────────
 
 ROL_ANFITRION = "anfitrion"

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +10,7 @@ import os
 
 from app.database import engine, Base
 from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, partidos, partido_arbitraje, partido_sets, asistencias, usuarios, auth, auditoria
+from app.scheduler import start_scheduler, stop_scheduler
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -18,7 +21,17 @@ limiter = Limiter(key_func=get_remote_address)
 # Crear carpeta de uploads si no existe
 os.makedirs("uploads", exist_ok=True)
 
-app = FastAPI(title="Torneos API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: arrancar el scheduler de recordatorios por WhatsApp
+    start_scheduler()
+    yield
+    # Shutdown: detener el scheduler limpiamente
+    stop_scheduler()
+
+
+app = FastAPI(title="Torneos API", version="0.1.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

@@ -11,3 +11,5 @@ boto3==1.35.0
 Pillow==10.4.0
 slowapi==0.1.9
 python-dotenv==1.0.1
+requests==2.32.3
+APScheduler==3.10.4
