@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from passlib.context import CryptContext
 
 from app.database import get_db
@@ -12,10 +14,13 @@ from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Iniciar sesión con celular + password."""
     ip = request.client.host if request.client else None
@@ -108,7 +113,8 @@ _codigos_reset = {}
 
 
 @router.post("/recuperar-password", status_code=200)
-def recuperar_password(data: RecuperarPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def recuperar_password(data: RecuperarPasswordRequest, request: Request, db: Session = Depends(get_db)):
     """
     Solicitar recuperación de contraseña.
     Envía un código de 6 dígitos al email del usuario.
@@ -150,7 +156,8 @@ def recuperar_password(data: RecuperarPasswordRequest, db: Session = Depends(get
 
 
 @router.post("/verificar-codigo-reset", status_code=200)
-def verificar_codigo_reset(data: VerificarCodigoRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def verificar_codigo_reset(data: VerificarCodigoRequest, request: Request, db: Session = Depends(get_db)):
     """
     Verificar código y cambiar contraseña.
     """

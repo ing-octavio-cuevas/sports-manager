@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,6 +12,13 @@ import os
 from app.database import engine, Base
 from app.routers import tournaments, anfitriones, equipos, jugadores, jornadas, partidos, partido_arbitraje, partido_sets, asistencias, usuarios, auth, auditoria
 from app.scheduler import start_scheduler, stop_scheduler
+
+# Logging: nivel INFO para ver el arranque del scheduler y los envíos de WhatsApp.
+# Los logs salen por stdout, visibles con `docker logs vsportmanager-api`.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
