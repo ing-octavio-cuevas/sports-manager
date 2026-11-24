@@ -1,4 +1,7 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -18,6 +21,9 @@ limiter = Limiter(key_func=get_remote_address)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
@@ -27,6 +33,11 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.celular == data.celular).first()
     if not usuario or not pwd_context.verify(data.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    return _completar_login(db, usuario, ip)
+
+
+def _completar_login(db: Session, usuario: Usuario, ip: Optional[str]) -> TokenResponse:
+    """Validaciones posteriores a la autenticación, auditoría y emisión del token."""
     if not usuario.estatus:
         raise HTTPException(status_code=401, detail="Usuario inactivo")
 
@@ -67,6 +78,34 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
             fecha_creacion=usuario.fecha_creacion,
         ),
     )
+
+
+class LoginCorreoRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/login-correo", response_model=TokenResponse)
+@limiter.limit("5/minute")
+def login_correo(data: LoginCorreoRequest, request: Request, db: Session = Depends(get_db)):
+    """Iniciar sesión con correo electrónico + password."""
+    ip = request.client.host if request.client else None
+    email = data.email.strip().lower()
+    if not email or not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    candidatos = db.query(Usuario).filter(
+        func.lower(func.trim(Usuario.email)) == email
+    ).all()
+    coincidencias = [
+        u for u in candidatos
+        if u.password_hash and pwd_context.verify(data.password, u.password_hash)
+    ]
+    # Sin coincidencias o correo duplicado con varias contraseñas válidas: mismo error genérico
+    if len(coincidencias) != 1:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    return _completar_login(db, coincidencias[0], ip)
 
 
 @router.get("/me", response_model=UsuarioResponse)
