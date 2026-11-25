@@ -2,7 +2,7 @@
 Schemas Pydantic para validación de entrada/salida.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
@@ -903,3 +903,42 @@ class DashboardTorneoResponse(BaseModel):
     estadisticas_generales: DashboardEstadisticasGenerales
     finanzas: DashboardFinanzas
     asistencias_por_equipo: list[DashboardAsistenciaEquipoResumen] = []
+
+
+# ─── Rol activo (jugador / anfitrión) ────────────────────────────
+
+class RolActivoCancha(BaseModel):
+    id: int
+    nombre: Optional[str] = None
+    direccion: Optional[str] = None
+    url: Optional[str] = None
+
+
+class RolActivoEquipo(BaseModel):
+    id: int
+    nombre: str
+    logo: Optional[str] = None
+
+
+class RolActivoPartido(BaseModel):
+    partido_id: int
+    fecha_hora: Optional[datetime] = None
+    tipo: Optional[str] = None
+    estatus: Optional[str] = None
+    puntos_local: int = 0
+    puntos_visitante: int = 0
+    cancha: Optional[RolActivoCancha] = None
+    local: RolActivoEquipo
+    visitante: RolActivoEquipo
+
+
+class RolActivoJornada(BaseModel):
+    jornada_id: int
+    numero: int
+    fecha: Optional[date] = None
+    partidos: list[RolActivoPartido] = []
+
+
+class RolActivoResponse(BaseModel):
+    torneo_id: int
+    jornadas: list[RolActivoJornada] = []

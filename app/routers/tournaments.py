@@ -4,8 +4,9 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database import get_db
-from app.models import Torneo, TorneoUbicacion, Partido
-from app.auth import require_role
+from app.models import Torneo, TorneoUbicacion, Partido, Jornada, Equipo, Jugador
+from fastapi.security import HTTPAuthorizationCredentials
+from app.auth import require_role, get_current_user
 from app.config import ROL_ANFITRION, ROL_JUGADOR
 from app.schemas import (
     TorneoCreate,
@@ -22,6 +23,7 @@ from app.schemas import (
     JugadorResponse,
     JugadorResumenPublico,
     ResultadosEquipoPublicoResponse,
+    RolActivoResponse,
 )
 
 router = APIRouter(prefix="/torneos", tags=["Torneos"])
@@ -734,6 +736,89 @@ def get_torneo_resumen(request: Request, torneo_id: int, db: Session = Depends(g
         rol=rol,
     )
 
+
+def _usuario_rol_activo(request: Request, db: Session = Depends(get_db)):
+    """Usuario autenticado; sin token responde 401 (HTTPBearer respondería 403)."""
+    partes = (request.headers.get("Authorization") or "").split(" ", 1)
+    if len(partes) != 2 or partes[0].lower() != "bearer" or not partes[1].strip():
+        raise HTTPException(status_code=401, detail="No autenticado")
+    return get_current_user(HTTPAuthorizationCredentials(scheme=partes[0], credentials=partes[1].strip()), db)
+
+
+@router.get("/{torneo_id}/rol-activo", response_model=RolActivoResponse)
+def get_rol_activo(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(_usuario_rol_activo)):
+    """Jornadas con partidos pendientes del torneo, con cancha y equipos incluidos."""
+    torneo = db.query(Torneo).filter(Torneo.id == torneo_id).first()
+    if not torneo:
+        raise HTTPException(status_code=404, detail="Torneo no encontrado")
+
+    es_anfitrion = usuario.anfitrion_id is not None and usuario.anfitrion_id == torneo.anfitrion_id
+    if not es_anfitrion:
+        inscrito = (
+            db.query(Jugador.id)
+            .join(Equipo, Equipo.id == Jugador.equipo_id)
+            .filter(
+                Jugador.usuario_id == usuario.id,
+                Jugador.estatus == True,
+                Equipo.torneo_id == torneo_id,
+                Equipo.estatus == True,
+            )
+            .first()
+        )
+        if not inscrito:
+            raise HTTPException(status_code=403, detail="No tienes acceso a este torneo")
+
+    partidos = (
+        db.query(Partido)
+        .join(Jornada, Jornada.id == Partido.jornada_id)
+        .filter(Jornada.torneo_id == torneo_id)
+        .order_by(
+            Partido.fecha_hora.is_(None),
+            Partido.fecha_hora.asc(),
+            Partido.ubicacion_id.is_(None),
+            Partido.ubicacion_id.asc(),
+            Partido.id.asc(),
+        )
+        .all()
+    )
+    por_jornada = {}
+    for p in partidos:
+        por_jornada.setdefault(p.jornada_id, []).append(p)
+
+    # Una jornada se envía si tiene al menos un partido sin resultado (estatus distinto de "Jugado", incluido NULL)
+    jornadas = (
+        db.query(Jornada)
+        .filter(Jornada.torneo_id == torneo_id)
+        .order_by(Jornada.numero.asc())
+        .all()
+    )
+    jornadas = [j for j in jornadas if any(p.estatus != "Jugado" for p in por_jornada.get(j.id, []))]
+
+    equipos_map = {e.id: e for e in db.query(Equipo).filter(Equipo.torneo_id == torneo_id).all()}
+    ubicaciones_map = {u.id: u for u in db.query(TorneoUbicacion).filter(TorneoUbicacion.torneo_id == torneo_id).all()}
+
+    def _equipo(equipo_id):
+        e = equipos_map.get(equipo_id)
+        return {"id": equipo_id, "nombre": e.nombre if e else f"Equipo {equipo_id}", "logo": e.logo if e else None}
+
+    resultado = []
+    for j in jornadas:
+        lista = []
+        for p in por_jornada[j.id]:
+            u = ubicaciones_map.get(p.ubicacion_id) if p.ubicacion_id else None
+            lista.append({
+                "partido_id": p.id,
+                "fecha_hora": p.fecha_hora,
+                "tipo": p.tipo,
+                "estatus": p.estatus,
+                "puntos_local": p.puntos_local or 0,
+                "puntos_visitante": p.puntos_visitante or 0,
+                "cancha": {"id": u.id, "nombre": u.nombre, "direccion": u.direccion, "url": u.ubicacion} if u else None,
+                "local": _equipo(p.equipo_local_id),
+                "visitante": _equipo(p.equipo_visitante_id),
+            })
+        resultado.append({"jornada_id": j.id, "numero": j.numero, "fecha": j.fecha, "partidos": lista})
+    return {"torneo_id": torneo_id, "jornadas": resultado}
 
 @router.get("/{torneo_id}/dashboard")
 def get_torneo_dashboard(torneo_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
