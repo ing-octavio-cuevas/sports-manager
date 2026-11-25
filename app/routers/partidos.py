@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import Partido, PartidoArbitraje, Torneo
@@ -293,7 +294,7 @@ def update_partido(partido_id: int, partido_data: PartidoUpdate, db: Session = D
 @router.delete("/{partido_id}", status_code=204)
 def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depends(require_role(ROL_ANFITRION))):
     """Eliminar un partido. No permite si tiene asistencias registradas."""
-    from app.models import Asistencia
+    from app.models import Asistencia, EventoAuditoria
 
     partido = db.query(Partido).filter(Partido.id == partido_id).first()
     if not partido:
@@ -307,8 +308,14 @@ def delete_partido(partido_id: int, db: Session = Depends(get_db), usuario=Depen
     tiene_asistencias = db.query(Asistencia).filter(Asistencia.partido_id == partido_id).first()
     if tiene_asistencias:
         raise HTTPException(status_code=400, detail="No se puede eliminar, el partido tiene asistencias registradas")
-    db.delete(partido)
-    db.commit()
+    # Conservar el historial de auditoria: desvincular los eventos del partido
+    db.query(EventoAuditoria).filter(EventoAuditoria.partido_id == partido_id).update({EventoAuditoria.partido_id: None}, synchronize_session=False)
+    try:
+        db.delete(partido)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="No se puede eliminar el partido porque tiene registros relacionados")
 
 
 # ─── Combinaciones pendientes ────────────────────────────────

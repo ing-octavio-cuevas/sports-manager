@@ -233,7 +233,7 @@ class EventoAuditoria(Base):
     tipo_evento = Column(String(50), nullable=False, index=True)
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=True, index=True)
     # Contexto opcional según el evento
-    partido_id = Column(Integer, ForeignKey("partido.id"), nullable=True, index=True)
+    partido_id = Column(Integer, ForeignKey("partido.id", ondelete="SET NULL"), nullable=True, index=True)
     equipo_id = Column(Integer, ForeignKey("equipo.id"), nullable=True, index=True)
     jugador_id = Column(Integer, ForeignKey("jugador.id"), nullable=True)
     # Descripción legible y detalle estructurado
